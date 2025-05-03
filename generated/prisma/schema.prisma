@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int      @id @default(autoincrement())
+  name     String
+  email    String   @unique
+  password String
+  role     UserRole @default(USER)
+  orders   Order[]
+}
+
+model Combo {
+  id     Int     @id @default(autoincrement())
+  name   String
+  price  Float
+  orders Order[] // Relación muchos-a-muchos con Order (Prisma crea tabla intermedia)
+}
+
+model Order {
+  id                Int         @id @default(autoincrement())
+  userId            Int
+  user              User        @relation(fields: [userId], references: [id])
+  combos            Combo[] // Muchos combos por orden
+  asistentes        Asistente[] // Muchos asistentes por orden
+  total             Float
+  status            String      @default("pending")
+  externalReference String? // Para almacenar ID externo (e.g. preferencia MP)
+  createdAt         DateTime    @default(now())
+}
+
+model Asistente {
+  id      Int    @id @default(autoincrement())
+  orderId Int
+  order   Order  @relation(fields: [orderId], references: [id])
+  name    String
+  email   String
+}
+
+enum UserRole {
+  SUPERADMIN
+  DESARROLLADOR
+  ADMIN
+  EDITOR
+  COLABORADOR
+  USER
+}
