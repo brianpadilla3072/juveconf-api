@@ -1,59 +1,155 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// schema.prisma
+// Aplicación de consorcios ("events") con múltiples preventas, pagos independientes,
+// registro de invitados y campos de auditoría (createdAt, updatedAt, deletedAt)
 
 generator client {
   provider = "prisma-client-js"
-  // output = "../generated/prisma"   ← **elimínalo** o coméntalo
+  // output = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// Enumeraciones
+enum UserRole {
+  SUPERADMIN
+  DEVELOPER
+  ADMIN
+  EDITOR
+  COLLABORATOR
+  USER
+}
+
+enum PaymentType {
+  TRANSFER
+  MERCADOPAGO
+}
+
+// Modelos con campos de auditoría
 model User {
-  id       Int      @id @default(autoincrement())
-  name     String
-  email    String   @unique
-  password String
-  role     UserRole @default(USER) 
-  orders   Order[]
+  id        Int        @id @default(autoincrement())
+  dni       String     @unique
+  name      String
+  email     String     @unique
+  password  String
+  role      UserRole   @default(USER)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  deletedAt DateTime?
+
+  orders    Order[]
+  payments  Payment[]
 }
 
 model Combo {
-  id     Int     @id @default(autoincrement())
-  name   String
-  price  Float
-  orders Order[]  // Muchos a muchos con Order
+  id        Int        @id @default(autoincrement())
+  name      String
+  price     Float
+  year      Int
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  deletedAt DateTime?
+
+  // Many-to-many implícita con Order
+  orders    Order[]
 }
 
+/// Evento o congreso
+model Event {
+  id             Int        @id @default(autoincrement())
+  year           Int
+  topic          String
+  capacity       Int
+  salesStartDate DateTime
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  preSales       PreSale[]  // Preventas múltiples
+  orders         Order[]
+}
+
+model PreSale {
+  id              Int        @id @default(autoincrement())
+  eventId         Int
+  event           Event      @relation(fields: [eventId], references: [id])
+
+  discountPercent Float
+  startDate       DateTime
+  ticketQuantity  Int
+  year            Int
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+}
 
 model Order {
-  id                Int         @id @default(autoincrement())
-  userId            Int
-  user              User        @relation(fields: [userId], references: [id])
-  combos            Combo[]     // Muchos combos por orden
-  asistentes        Asistente[] // Muchos asistentes por orden
-  total             Float
-  status            String      @default("pending")
-  externalReference String?     // Para almacenar ID externo (e.g. preferencia MP)
-  createdAt         DateTime    @default(now())
+  id              Int        @id @default(autoincrement())
+  year            Int
+
+  userId          Int
+  user            User       @relation(fields: [userId], references: [id])
+
+  eventId         Int
+  event           Event      @relation(fields: [eventId], references: [id])
+
+  // Many-to-many implícita con Combo
+  combos          Combo[]
+
+  total           Float
+  status          String     @default("pending")
+  paymentType     PaymentType
+  externalReference String?
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  payments        Payment[]
+  invitees        Invitee[]
 }
 
-model Asistente {
-  id      Int    @id @default(autoincrement())
-  orderId Int
-  order   Order  @relation(fields: [orderId], references: [id])
-  name    String
-  email   String
+model Payment {
+  id              Int        @id @default(autoincrement())
+  year            Int
+
+  orderId         Int
+  order           Order      @relation(fields: [orderId], references: [id])
+
+  amount          Float
+  type            PaymentType
+  externalReference String?
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  // Relación opcional con usuario
+  userId          Int?
+  user            User?      @relation(fields: [userId], references: [id])
+
+  payerName       String?
+  payerEmail      String?
+  payerDni        String?
+
+  invitees        Invitee[]
 }
-enum UserRole {
-  SUPERADMIN
-  DESARROLLADOR
-  ADMIN
-  EDITOR
-  COLABORADOR
-  USER
+
+model Invitee {
+  id              Int        @id @default(autoincrement())
+  name            String
+  dni             String
+
+  orderId         Int?
+  order           Order?     @relation(fields: [orderId], references: [id])
+
+  paymentId       Int?
+  payment         Payment?   @relation(fields: [paymentId], references: [id])
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
 }

@@ -14,7 +14,7 @@ import { PasswordService } from '../global/password.service';
 @Injectable()
 export class UsersService {
     constructor(private prisma: PrismaService, private passwordService: PasswordService) {}
-    async createUser(data: { name: string; email: string; password: string }) {
+    async createUser(data: { name: string; email: string; password: string ; dni:string }) {
       // Cifra la contraseña antes de guardarla
       const hashedPassword = await this.passwordService.hashPassword(data.password);
   

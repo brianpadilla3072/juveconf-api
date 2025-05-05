@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
-import { PaymentsController } from './payments.controller';
-import { PaymentsService } from './payments.service';
+/* eslint-disable prettier/prettier */
 import { PrismaService } from 'prisma/prisma.service';
+import { Module } from '@nestjs/common';
+import { PaymentsService } from './payments.service';
+import { PaymentsController } from './payments.controller';
 
 @Module({
   controllers: [PaymentsController],

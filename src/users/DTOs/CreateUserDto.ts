@@ -16,8 +16,11 @@ export class CreateUserDto {
   @IsString({ message: 'La contraseña debe ser un texto.' })
   @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres.' })
   password: string;
-  
+
   @IsEnum(UserRole, { message: 'El rol debe ser válido.' })
   role: UserRole;
+  @IsNotEmpty({ message: 'El DNI es obligatorio.' })
+  @IsString({ message: 'El DNI debe ser un texto.' })
+  dni: string;
 
 }

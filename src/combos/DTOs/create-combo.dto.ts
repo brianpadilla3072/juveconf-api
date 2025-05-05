@@ -8,4 +8,5 @@ export class CreateComboDto {
 
   @IsNumber()
   price: number;
+  year: number;
 }

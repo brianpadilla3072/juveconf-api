@@ -9,11 +9,11 @@
 /* eslint-disable prettier/prettier */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-
+import { PaymentType } from '@prisma/client';
 @Injectable()
 export class OrdersService {
     constructor(private prisma: PrismaService) {}
-    async createOrder(userId: number, comboIds: number[]) {
+    async createOrder(userId: number, comboIds: number[], paymentType:PaymentType, year:number, eventId:number) {
         // Calcular total sumando precios de los combos
         const combos = await this.prisma.combo.findMany({ where: { id: { in: comboIds } } });
         const total = combos.reduce((sum, c) => sum + c.price, 0);
@@ -23,6 +23,9 @@ export class OrdersService {
             total,
             combos: { connect: comboIds.map(id => ({ id })) },
             status: 'pending',
+            paymentType,
+            year,
+            eventId
           },
         });
       }
