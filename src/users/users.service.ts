@@ -29,7 +29,7 @@ export class UsersService {
       async findAllUsers() {
         return this.prisma.user.findMany();
       }
-      async getUser(id: number) {
+      async getUser(id: string) {
         const user = await this.prisma.user.findUnique({ where: { id }});
         if (!user) throw new NotFoundException(`Usuario ${id} no existe`);
         return user;

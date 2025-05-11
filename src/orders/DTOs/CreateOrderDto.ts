@@ -5,9 +5,9 @@ import { PaymentType } from '@prisma/client';
 
 export class CreateOrderDto {
   @IsNotEmpty()
-  userId: number;
+  userId: string;
   @IsNotEmpty()
-  comboIds: number[];
+  comboIds: string[];
   @IsNotEmpty()
   @IsEnum(PaymentType)
   paymentType: PaymentType; 
@@ -16,5 +16,5 @@ export class CreateOrderDto {
   year: number; 
   @IsNotEmpty()
   @IsInt()
-  eventId: number; 
+  eventId: string; 
 }

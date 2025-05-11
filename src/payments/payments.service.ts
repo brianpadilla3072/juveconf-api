@@ -30,7 +30,7 @@ export class PaymentsService {
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
     });
@@ -40,7 +40,7 @@ export class PaymentsService {
     return payment;
   }
 
-  async update(id: number, updatePaymentDto: UpdatePaymentDto) {
+  async update(id: string, updatePaymentDto: UpdatePaymentDto) {
     const existingPayment = await this.findOne(id);
     return this.prisma.payment.update({
       where: { id: existingPayment.id },
@@ -48,7 +48,7 @@ export class PaymentsService {
     });
   }
 
-  async remove(id: number) {
+  async remove(id: string) {
     const existingPayment = await this.findOne(id);
     return this.prisma.payment.update({
       where: { id: existingPayment.id },

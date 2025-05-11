@@ -5,7 +5,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { PasswordService } from '../global/password.service'; // Este es el servicio para manejar las contraseñas
 import { JwtService } from '@nestjs/jwt'; // Si deseas usar JWT en el futuro
@@ -27,7 +27,9 @@ export class AuthService {
     if (!user) {
       return false;  // Usuario no encontrado
     }
-
+    if (!user.password) {
+    throw new UnauthorizedException('El usuario no tiene contraseña local asignada.');
+}
     // Compara la contraseña en texto claro con la contraseña cifrada
     const isPasswordValid = await this.passwordService.comparePasswords(password, user.password);
 

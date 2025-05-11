@@ -9,4 +9,7 @@ export class CreateComboDto {
   @IsNumber()
   price: number;
   year: number;
+  minPersons: number;
+
+    eventId: string; 
 }

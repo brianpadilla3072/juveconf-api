@@ -23,17 +23,17 @@ export class CombosService {
     return this.prisma.combo.findMany();
   }
 
-  async findOne(id: number): Promise<Combo> {
-    const combo = await this.prisma.combo.findUnique({ where: { id } });
+  async findOne(id: string): Promise<Combo> {
+    const combo = await this.prisma.combo.findFirst({where:{id}});
     if (!combo) throw new NotFoundException('Combo not found');
     return combo;
   }
 
-  async update(id: number, dto: UpdateComboDto): Promise<Combo> {
+  async update(id: string, dto: UpdateComboDto): Promise<Combo> {
     return this.prisma.combo.update({ where: { id }, data: dto });
   }
 
-  async remove(id: number): Promise<Combo> {
+  async remove(id: string): Promise<Combo> {
     return this.prisma.combo.delete({ where: { id } });
   }
 }

@@ -20,16 +20,16 @@ export class CombosController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.combosService.findOne(+id);
+    return this.combosService.findOne(id);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateComboDto) {
-    return this.combosService.update(+id, dto);
+    return this.combosService.update(id, dto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.combosService.remove(+id);
+    return this.combosService.remove(id);
   }
 }

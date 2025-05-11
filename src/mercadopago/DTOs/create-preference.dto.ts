@@ -1,30 +1,33 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import { IsEmail, IsInt, IsString, Min } from 'class-validator';
+import { IsString, IsEmail, IsNumber, IsArray, IsOptional } from 'class-validator';
+import { PaymentType } from '@prisma/client';
 
 export class CreatePreferenceDto {
   @IsString()
   id: string;
-
+  eventId: string
+  paymentType:PaymentType
   @IsEmail()
   email: string;
 
   @IsString()
   title: string;
 
-  @IsInt()
-  @Min(1)
+  @IsNumber()
   unit_price: number;
 
-  @IsInt()
-  @Min(1)
+  @IsNumber()
   quantity: number;
 
-  @IsInt()
-  @Min(1)
+  @IsNumber()
   minPersons: number;
 
-  @IsInt()
-  @Min(1)
+  @IsNumber()
   maxPersons: number;
+
+  @IsArray()
+  attendees: any[];
+  @IsOptional()
+  userId?: string | null
 }

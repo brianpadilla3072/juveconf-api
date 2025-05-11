@@ -76,7 +76,6 @@
 - agregar webhook de mp
 - agregar roles de usuario
 - agregar swager
-- modificar tabla para login con auth0 y email
 - realizar crud de ` <combos> <invitados> <ordenes[create]> <eventos> <users> <preventa>`
 - realizar flujo de mp
 - realizar flujo de transferencia

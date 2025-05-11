@@ -1,10 +1,9 @@
-// schema.prisma
 // Aplicación de consorcios ("events") con múltiples preventas, pagos independientes,
 // registro de invitados y campos de auditoría (createdAt, updatedAt, deletedAt)
 
 generator client {
   provider = "prisma-client-js"
-  // output = "../generated/prisma"
+  // output = "../generated/prisma" // Habilitar si desea customizar el path
 }
 
 datasource db {
@@ -27,129 +26,149 @@ enum PaymentType {
   MERCADOPAGO
 }
 
-// Modelos con campos de auditoría
-model User {
-  id        Int        @id @default(autoincrement())
-  dni       String     @unique
-  name      String
-  email     String     @unique
-  password  String
-  role      UserRole   @default(USER)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  deletedAt DateTime?
+enum AuthProvider {
+  LOCAL
+  AUTH0
+}
 
-  orders    Order[]
-  payments  Payment[]
+// Modelos principales
+model User {
+  id              String       @id @default(uuid())
+  auth0Id         String?      @unique
+  provider        AuthProvider @default(LOCAL)
+  dni             String       @unique
+  name            String
+  givenName       String?
+  familyName      String?
+  nickname        String?
+  email           String       @unique
+  emailVerified   Boolean      @default(false)
+  picture         String?
+  locale          String?
+  password        String?      // Opcional si el usuario se registra vía Auth0
+  role            UserRole     @default(USER)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  lastLogin       DateTime?
+  deletedAt       DateTime?
+
+  orders          Order[]
+  payments        Payment[]
+}
+
+model Event {
+  id              String       @id @default(uuid())
+  year            Int
+  topic           String
+  capacity        Int
+  salesStartDate  DateTime
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+
+  preSales        PreSale[]
+  orders          Order[]
+  combos          Combo[]      // Relación inversa agregada
 }
 
 model Combo {
-  id        Int        @id @default(autoincrement())
-  name      String
-  price     Float
-  year      Int
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  deletedAt DateTime?
+  id              String       @id @default(uuid())
+  name            String
+  price           Float
+  year            Int
+  minPersons      Int
 
-  // Many-to-many implícita con Order
-  orders    Order[]
-}
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
 
-/// Evento o congreso
-model Event {
-  id             Int        @id @default(autoincrement())
-  year           Int
-  topic          String
-  capacity       Int
-  salesStartDate DateTime
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  deletedAt      DateTime?
+  eventId         String
+  event           Event        @relation(fields: [eventId], references: [id])
 
-  preSales       PreSale[]  // Preventas múltiples
-  orders         Order[]
+  orders          Order[]
+
+  @@unique([name, year]) // Evita duplicar combos con el mismo nombre en el mismo año
 }
 
 model PreSale {
-  id              Int        @id @default(autoincrement())
-  eventId         Int
-  event           Event      @relation(fields: [eventId], references: [id])
+  id              String       @id @default(uuid())
+  eventId         String
+  event           Event        @relation(fields: [eventId], references: [id])
 
   discountPercent Float
   startDate       DateTime
   ticketQuantity  Int
   year            Int
 
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
   deletedAt       DateTime?
 }
 
 model Order {
-  id              Int        @id @default(autoincrement())
-  year            Int
+  id                String       @id @default(uuid())
+  year              Int
+  userId            String?
+  user              User?        @relation(fields: [userId], references: [id])
 
-  userId          Int
-  user            User       @relation(fields: [userId], references: [id])
+  eventId           String
+  event             Event        @relation(fields: [eventId], references: [id])
 
-  eventId         Int
-  event           Event      @relation(fields: [eventId], references: [id])
+  combos            Combo[]      // Relación many-to-many implícita
 
-  // Many-to-many implícita con Combo
-  combos          Combo[]
-
-  total           Float
-  status          String     @default("pending")
-  paymentType     PaymentType
+  total             Float
+  status            String       @default("pending")
+  paymentType       PaymentType
   externalReference String?
+  metadataToken     String?
 
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  deletedAt       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  deletedAt         DateTime?
 
-  payments        Payment[]
-  invitees        Invitee[]
+  payments          Payment[]
+  invitees          Invitee[]
 }
 
 model Payment {
-  id              Int        @id @default(autoincrement())
-  year            Int
+  id                String       @id @default(uuid())
+  year              Int
 
-  orderId         Int
-  order           Order      @relation(fields: [orderId], references: [id])
+  orderId           String
+  order             Order        @relation(fields: [orderId], references: [id])
 
-  amount          Float
-  type            PaymentType
+  amount            Float
+  type              PaymentType
   externalReference String?
 
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  deletedAt       DateTime?
+  userId            String?
+  user              User?        @relation(fields: [userId], references: [id])
 
-  // Relación opcional con usuario
-  userId          Int?
-  user            User?      @relation(fields: [userId], references: [id])
+  payerName         String?
+  payerEmail        String?
+  payerDni          String?
 
-  payerName       String?
-  payerEmail      String?
-  payerDni        String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  deletedAt         DateTime?
 
-  invitees        Invitee[]
+  invitees          Invitee[]
 }
 
 model Invitee {
-  id              Int        @id @default(autoincrement())
+  id              String        @id @default(uuid())
   name            String
   dni             String
 
-  orderId         Int?
-  order           Order?     @relation(fields: [orderId], references: [id])
+  orderId         String?
+  order           Order?        @relation(fields: [orderId], references: [id])
 
-  paymentId       Int?
-  payment         Payment?   @relation(fields: [paymentId], references: [id])
+  paymentId       String?
+  payment         Payment?      @relation(fields: [paymentId], references: [id])
 
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?
 }

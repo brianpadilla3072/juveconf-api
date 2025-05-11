@@ -9,7 +9,7 @@ export class CreatePaymentDto {
   
   @IsInt()
   @IsNotEmpty()
-  orderId: number;
+  orderId: string;
 
   @IsNumber()
   @IsNotEmpty()
@@ -25,7 +25,7 @@ export class CreatePaymentDto {
 
   @IsOptional()
   @IsInt()
-  userId?: number;
+  userId?: string;
 
   @IsOptional()
   @IsString()
