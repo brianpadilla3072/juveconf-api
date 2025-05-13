@@ -11,12 +11,12 @@ export class JwtService {
     return jwt.sign(payload, this.secret, { algorithm: 'HS256' });
   }
 
-  verifyMetadata(token: string): boolean {
+ verifyMetadata(token: string): Record<string, unknown> | null {
   try {
-    jwt.verify(token, this.secret);
-    return true;  // Si el token es válido, devuelve true
+    const decoded = jwt.verify(token, this.secret);
+    return decoded as Record<string, unknown>;  // Devuelve el payload decodificado
   } catch (err) {
-    return false;  // Si ocurre un error, el token es inválido, por lo tanto devuelve false
+    return null;  // Si ocurre un error, devuelve null
   }
 }
    // Decodificar token sin verificar (solo obtener los datos)

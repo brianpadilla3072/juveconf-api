@@ -1,15 +1,23 @@
 /* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-import { IsString, IsEmail, IsNumber, IsArray, IsOptional } from 'class-validator';
-import { PaymentType } from '@prisma/client';
+import { IsString, IsEmail, IsNumber, IsArray, IsOptional, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class AttendeeDto {
+  @IsString()
+  name: string;
+
+  @IsString()
+  dni: string;
+}
 
 export class CreatePreferenceDto {
   @IsString()
   id: string;
-  eventId: string
-  paymentType:PaymentType
+
   @IsEmail()
   email: string;
+  @IsNumber()
+  cuil:string
 
   @IsString()
   title: string;
@@ -23,11 +31,19 @@ export class CreatePreferenceDto {
   @IsNumber()
   minPersons: number;
 
+  @IsOptional()
   @IsNumber()
-  maxPersons: number;
+  maxPersons?: number;
 
   @IsArray()
-  attendees: any[];
+  @ValidateNested({ each: true })
+  @Type(() => AttendeeDto)
+  attendees: AttendeeDto[];
+
+  @IsString()
+  eventId: string;
+
   @IsOptional()
-  userId?: string | null
+  @IsString()
+  userId?:string
 }

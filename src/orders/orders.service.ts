@@ -7,52 +7,57 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable prettier/prettier */
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { PaymentType } from '@prisma/client';
+import { Order, PaymentType } from '@prisma/client';
+import { OrderStatus } from './enums/order-status.enum';
+import { JwtService } from 'src/jwt/jwt.service';
+
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) { }
+    private readonly logger = new Logger(OrdersService.name);
+
+  constructor(private prisma: PrismaService,private jwtService: JwtService) { }
   async createOrder(data: {
-  id:string
-  userId?: string | null;
-  comboId: string;
-  paymentType: PaymentType;
-  year: number;
-  quantity: number;
-  unitPrice: number;
-  metadataToken: string;
-}) {
-  const { userId, comboId, paymentType, quantity, unitPrice, metadataToken,id } = data;
-      const year = new Date().getFullYear();
+    id: string
+    userId?: string | null;
+    comboId: string;
+    paymentType: PaymentType;
+    year: number;
+    quantity: number;
+    unitPrice: number;
+    metadataToken: string;
+  }) {
+    const { userId, comboId, paymentType, quantity, unitPrice, metadataToken, id } = data;
+    const year = new Date().getFullYear();
 
-  // Buscar el combo
-  const combo = await this.prisma.combo.findUnique({
-    where: { id: comboId },
-  });
+    // Buscar el combo
+    const combo = await this.prisma.combo.findUnique({
+      where: { id: comboId },
+    });
 
-  if (!combo) {
-    throw new Error('Combo no encontrado');
-  }
-  const total = unitPrice * quantity;
+    if (!combo) {
+      throw new Error('Combo no encontrado');
+    }
+    const total = unitPrice * quantity;
 
-  // Crear la orden y vincular el combo
-  return this.prisma.order.create({
-    data: {
-      id,
-      userId: userId ?? null,
-      eventId: combo.eventId,
-      year,
-      total,
-      status: 'pending',
-      paymentType,
-      metadataToken,
-      combos: {
-        connect: [{ id: comboId }],
+    // Crear la orden y vincular el combo
+    return this.prisma.order.create({
+      data: {
+        id,
+        userId: userId ?? null,
+        eventId: combo.eventId,
+        year,
+        total,
+        status: 'pending',
+        paymentType,
+        metadataToken,
+        combos: {
+          connect: [{ id: comboId }],
+        },
       },
-    },
-  });
-}
+    });
+  }
 
   async updateOrder(
     orderId: string,
@@ -90,5 +95,39 @@ export class OrdersService {
       },
     });
   }
+  async updateStatus(orderId: string, status: OrderStatus): Promise<Order> {
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status },
+    });
+  }
+  async getOrdersByCuil(cuil: string) {
 
+    // Obtener todas las órdenes
+    const orders = await this.prisma.order.findMany({
+      where: { status: 'pending' , paymentType:PaymentType.TRANSFER}, // Puedes agregar más filtros si lo necesitas
+    });
+
+
+    // Filtrar las órdenes que coinciden con el CUIL
+    const filteredOrders = orders.filter((order) => {
+      const token = order.metadataToken || ''; // Obtener el metadataToken de la orden
+      let includesCuil: boolean  |null = false;
+
+      try {
+        // Verificar el token de la metadata
+        const decodedPayload = this.jwtService.verifyMetadata(String(token));  // Decodificar el token
+        includesCuil = decodedPayload && decodedPayload.cuil === cuil;  // Verificar si el CUIL coincide
+      } catch (err) {
+        this.logger.warn(`[OrdersService] Error al verificar el token de la orden ID ${order.id}: ${err.message}`);
+      }
+
+      return includesCuil;  // Solo las órdenes con el CUIL correcto son incluidas
+    });
+
+
+    return filteredOrders;  // Retornar las órdenes filtradas
+  }
 }
+export { OrderStatus };
+

@@ -11,9 +11,11 @@ import { MercadopagoModule } from './mercadopago/mercadopago.module';
 import { MailModule } from './mail/mail.module';
 import { RawBodyMiddleware } from './middlewares/raw-body'; // Asegúrate de que la ruta sea correcta
 import { json } from 'express';
+import { EventModule } from './events/event.module';
+import { TransfersModule } from './transfers/transfers.module';
 
 @Module({
-  imports: [UsersModule, CombosModule, OrdersModule, PaymentsModule, MercadopagoModule,MailModule],
+  imports: [UsersModule, CombosModule, OrdersModule, PaymentsModule, MercadopagoModule,MailModule,EventModule,TransfersModule],
   controllers: [AppController],
   providers: [AppService
     , PrismaService

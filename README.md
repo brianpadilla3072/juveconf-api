@@ -73,10 +73,14 @@
 - Recordatorios para usuarios que asistieron en años anteriores.
 
 # Tareas
-- agregar webhook de mp
 - agregar roles de usuario
 - agregar swager
 - realizar crud de ` <combos> <invitados> <ordenes[create]> <eventos> <users> <preventa>`
-- realizar flujo de mp
 - realizar flujo de transferencia
 - envio de email con los datos del combo
+- cron para eliminar ordenes de tipo mercado pago que esten en pending por 20 dias
+- cron para eliminar ordenes de typo transacction que tesn en pending hace 15 dias
+- crear un enpoint para aprobar ordenes de type tranfer 
+- guanrdar invitados en ambos casos
+- agrefar a crear orden que verifique si el evento ya puede vender
+- verificar armar las preventas y descontar al seoeccionar un typo de transaccion 

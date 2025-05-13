@@ -121,7 +121,7 @@ model Order {
   total             Float
   status            String       @default("pending")
   paymentType       PaymentType
-  externalReference String?
+  externalReference String? @unique
   metadataToken     String?
 
   createdAt         DateTime     @default(now())
