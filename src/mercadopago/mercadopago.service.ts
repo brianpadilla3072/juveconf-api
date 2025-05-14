@@ -1,4 +1,6 @@
 /* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
@@ -6,7 +8,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable prettier/prettier */
-// ----------------------- MercadopagoService.ts -----------------------
 import { Injectable, Logger } from '@nestjs/common';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { HttpService } from '@nestjs/axios';
@@ -15,11 +16,21 @@ import { JwtService } from 'src/jwt/jwt.service';
 import { PrismaService } from 'prisma/prisma.service';
 import { OrderStatus } from 'src/orders/orders.service';
 import { PaymentType } from '@prisma/client';
-import { CreatePreferenceDto } from './DTOs/create-preference.dto';
+import { AttendeeDto, CreatePreferenceDto } from './DTOs/create-preference.dto';
 import { CustomError } from 'src/global/CustomError';
 import { firstValueFrom } from 'rxjs';
 
-
+interface MetadataPayload {
+  userId: string | null;
+  eventId: string;
+  comboId: string;
+  quantity: number;
+  email: string;
+  cuil: string;
+  totalAmount: number;
+  currency: string;
+  attendees: AttendeeDto
+}
 
 @Injectable()
 export class MercadopagoService {
@@ -39,49 +50,54 @@ export class MercadopagoService {
     this.paymentClient = new Payment(this.mpConfig);
   }
 
- async createPreference(dto: CreatePreferenceDto): Promise<string> {
-  try {
-    // 1) Obtener combo
-    const combo = await this.combosService.findOne(dto.id);
-    if (!combo) throw new CustomError(404, 'Combo no encontrado', 'No pudimos encontrar el combo solicitado.');
+async createPreference(dto: CreatePreferenceDto): Promise<string> {
+  // 1) Obtener combo y payload para validaciones
+  const combo = await this.combosService.findOne(dto.id);
+  if (!combo) throw new CustomError(404, 'Combo no encontrado', 'No pudimos encontrar el combo solicitado.');
 
-    // 1.1) VERIFICACION DE SEGURIDAD
-    const pendingOrders = await this.prisma.order.findMany({
-      where: {
+  const payloadForCheck = { comboId: dto.id, email: dto.email, cuil: dto.cuil };
+
+  // 2) Validar órdenes pendientes
+  const pendingOrders = await this.prisma.order.findMany({
+    where: { status: OrderStatus.PENDING, paymentType: PaymentType.MERCADOPAGO, eventId: dto.eventId }
+  });
+  for (const order of pendingOrders) {
+    if (!order.metadataToken) continue;
+    let existing: Record<string, any> | null;
+    try {
+      existing = this.jwtService.verifyMetadata(order.metadataToken);
+    } catch {
+      continue;
+    }
+    if (!existing) continue;
+    if (
+      existing.comboId === payloadForCheck.comboId &&
+      existing.email === payloadForCheck.email &&
+      existing.cuil === payloadForCheck.cuil
+    ) {
+      throw new CustomError(400, 'Ya existe una orden pendiente', 'Ya existe una orden pendiente para este combo con este email y CUIL.');
+    }
+  }
+
+  // 3) Transacción: crear orden, token con orderId, preferencia y actualizar orden
+  return await this.prisma.$transaction(async (tx) => {
+    // 3.1) Crear orden pendiente (sin token ni referencia externa)
+    const totalAmount = combo.price * combo.minPersons;
+    const order = await tx.order.create({
+      data: {
+        year: new Date().getFullYear(),
+        userId: dto.userId,
+        eventId: dto.eventId,
+        total: totalAmount,
         status: OrderStatus.PENDING,
         paymentType: PaymentType.MERCADOPAGO,
-        eventId: dto.eventId,
+        combos: { connect: [{ id: combo.id }] },
       },
     });
 
-    // Validar órdenes pendientes
-    for (const order of pendingOrders) {
-      const token = order.metadataToken;
-      if (!token) {
-        continue;
-      }
-
-      let payload: Record<string, any> | null = null;
-      try {
-        payload = this.jwtService.verifyMetadata(token);
-      } catch (err) {
-        this.logger.warn(`Error al verificar token de orden ID ${order.id}: ${err.message}`);
-        continue;
-      }
-
-      if (
-        payload &&
-        payload.comboId === dto.id &&
-        payload.email === dto.email &&
-        payload.cuil === dto.cuil
-      ) {
-        throw new CustomError(400, 'Ya existe una orden pendiente', 'Ya existe una orden pendiente para este combo con este email y CUIL.');
-      }
-    }
-
-    // 2) Calcular total y crear JWT interno
-    const totalAmount = combo.price * combo.minPersons;
-    const payload = {
+    // 3.2) Generar token de metadata incluyendo el id de la orden
+    const metadataPayload = {
+      orderId: order.id,
       userId: dto.userId || null,
       eventId: dto.eventId,
       comboId: combo.id,
@@ -90,33 +106,13 @@ export class MercadopagoService {
       cuil: dto.cuil,
       totalAmount,
       currency: 'ARS',
+      attendees: dto.attendees,
     };
-    const metadataToken = this.jwtService.signMetadata(payload);
+    const metadataToken = this.jwtService.signMetadata(metadataPayload);
 
-    // 3) Crear orden pendiente en la base de datos
-    const order = await this.prisma.order.create({
-      data: {
-        year: new Date().getFullYear(),
-        userId: dto.userId,
-        eventId: dto.eventId,
-        total: totalAmount,
-        status: OrderStatus.PENDING,
-        paymentType: PaymentType.MERCADOPAGO,
-        metadataToken,
-        combos: {
-        connect:  [{ id: combo.id }]
-    },
-      },
-    });
-
-    // 4) Crear preferencia en MercadoPago
+    // 3.3) Crear preferencia en MercadoPago
     const preferenceRequest = {
-      items: [{
-        id: combo.id,
-        title: combo.name,
-        unit_price: combo.price,
-        quantity: combo.minPersons,
-      }],
+      items: [{ id: combo.id, title: combo.name, unit_price: combo.price, quantity: combo.minPersons }],
       metadata: { token: metadataToken },
       external_reference: String(order.id),
     };
@@ -125,26 +121,23 @@ export class MercadopagoService {
       throw new CustomError(500, 'Error en la creación de preferencia', 'No se pudo crear la preferencia de pago.');
     }
 
-    // 5) Guardar referencia externa en la orden
-    await this.prisma.order.update({
+    // 3.4) Actualizar orden con metadataToken y externalReference
+    await tx.order.update({
       where: { id: order.id },
-      data: { externalReference: preference.id },
+      data: { metadataToken, externalReference: preference.id },
     });
 
     return preference.init_point;
-  } catch (error) {
-    if (error instanceof CustomError) {
-      // Enviar el error como una respuesta manejada
-      throw error;
-    }
-    this.logger.error('Error en la creación de preferencia:', error.message);
+  }).catch(error => {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(500, 'Error inesperado', 'Hubo un error inesperado. Por favor, intenta de nuevo.');
-  }
+  });
 }
 
 
+
   async processNotification(rawBody: string): Promise<'OK' | 'ERROR'> {
-    this.logger.debug('===> Iniciando procesamiento de notificación');
+    this.logger.log('Iniciando procesamiento de notificación de pago...');
 
     // 1) Parsear la notificación
     let data;
@@ -153,7 +146,7 @@ export class MercadopagoService {
       data = parsed.data;
       this.logger.debug(`Datos de notificación recibidos: ${JSON.stringify(data)}`);
     } catch (err) {
-      this.logger.error('Error al parsear el cuerpo de la notificación:', err.message);
+      this.logger.error(`Error al parsear notificación: ${err.message}`);
       return 'ERROR';
     }
 
@@ -164,53 +157,52 @@ export class MercadopagoService {
     let mpPayment;
     try {
       mpPayment = await this.paymentClient.get({ id: paymentId });
-      this.logger.debug(`Detalles de pago: ${JSON.stringify(mpPayment)}`);
+      this.logger.debug(`Detalles del pago obtenidos: ${JSON.stringify(mpPayment)}`);
     } catch (err) {
-      this.logger.error(`Error al obtener detalles de pago: ${err.message}`);
+      this.logger.error(`Error al obtener detalles de pago de MP: ${err.message}`);
       return 'ERROR';
     }
 
     // 3) Validar JWT interno
     const token = mpPayment.metadata?.token;
     if (!token) {
-      this.logger.error('No se encontró token en metadata');
+      this.logger.error('No se encontró token en metadata del pago.');
       return 'ERROR';
     }
 
-    // Obtener el payload del token JWT
     let payload: any;
     try {
-      payload = this.jwtService.verifyMetadata(token); // Ya se maneja la verificación aquí
+      payload = this.jwtService.verifyMetadata(token);
+      this.logger.debug(`Payload del token: ${JSON.stringify(payload)}`);
       if (!payload) {
-        this.logger.error('JWT inválido o expirado');
+        this.logger.error('JWT inválido o expirado.');
         return 'ERROR';
       }
-      this.logger.debug(`Payload JWT decodificado: ${JSON.stringify(payload)}`);
     } catch (err) {
-      this.logger.error('Error al verificar el JWT:', err.message);
+      this.logger.error(`Error al verificar el JWT: ${err.message}`);
       return 'ERROR';
     }
 
     // 4) Validar monto y moneda
-    this.logger.debug(`Comparando montos: MP=${mpPayment.transaction_amount} vs JWT=${payload.totalAmount}`);
-    this.logger.debug(`Comparando monedas: MP=${mpPayment.currency_id} vs JWT=${payload.currency}`);
-
     if (
       mpPayment.transaction_amount !== payload.totalAmount ||
       mpPayment.currency_id !== payload.currency
     ) {
-      this.logger.error('Monto o moneda no coinciden');
+      this.logger.error(
+        `Monto o moneda no coinciden. MP=${mpPayment.transaction_amount}/${mpPayment.currency_id}, Payload=${payload.totalAmount}/${payload.currency}`,
+      );
       return 'ERROR';
     }
-
+    console.log(payload);
+    
     // 5) Buscar y actualizar orden interna
     this.logger.debug(`Buscando orden con externalReference: ${data.preference_id}`);
-
-    const order = await this.prisma.order.findFirst({
-      where: { externalReference: data.preference_id },
+    const order = await this.prisma.order.findUnique({
+      where: { id: payload.orderId },
     });
+
     if (!order) {
-      this.logger.error('Orden interna no encontrada:', data.preference_id);
+      this.logger.error(`Orden interna no encontrada: ${data.preference_id}`);
       return 'ERROR';
     }
 
@@ -228,21 +220,21 @@ export class MercadopagoService {
         newStatus = OrderStatus.REJECTED;
         break;
       default:
-        this.logger.warn('Estado no manejado:', mpPayment.status);
+        this.logger.warn(`Estado de pago no manejado: ${mpPayment.status}`);
         newStatus = OrderStatus.PENDING;
     }
 
-    this.logger.debug(`Nuevo estado de la orden: ${newStatus}`);
-
+    this.logger.debug(`Nuevo estado de la orden será: ${newStatus}`);
     await this.prisma.order.update({
       where: { id: order.id },
       data: { status: newStatus },
     });
 
-    // 6) Registrar pago en BD
-    this.logger.debug('Registrando nuevo pago en base de datos');
-
-    await this.prisma.payment.create({
+    // 6) Registrar pago
+    this.logger.debug('Registrando pago en base de datos...');
+    console.log(mpPayment);
+    
+    const payment = await this.prisma.payment.create({
       data: {
         year: new Date().getFullYear(),
         orderId: order.id,
@@ -250,16 +242,59 @@ export class MercadopagoService {
         type: PaymentType.MERCADOPAGO,
         externalReference: String(mpPayment.id),
         userId: payload.userId,
-        payerEmail: payload.metadata?.email,
-        payerName: `${mpPayment.payer?.first_name} ${mpPayment.payer?.last_name}`,
-        payerDni: payload.metadata?.cuil || null,
+        payerEmail: mpPayment.payer?.email ||payload.metadata?.email,
+        payerName: ` ${mpPayment.payer?.first_name} ${mpPayment.payer?.last_name} -${mpPayment.payer?.email} - phone ${mpPayment.payer?.phone.number} - ${mpPayment.payer?.identification.number} ${mpPayment.payer?.identification.type}`,
+        payerDni: String(mpPayment.payer?.identification.number ||  payload.metadata?.cuil) ,
       },
     });
+    this.logger.debug(`Pago registrado: ID=${payment.id}`);
 
-    this.logger.debug('Procesamiento de notificación finalizado correctamente');
+    // 7) Crear asistentes (invitees)
+    function isAttendeeDto(obj: any): obj is AttendeeDto {
+      return (
+        obj &&
+        typeof obj === 'object' &&
+        typeof obj.name === 'string' &&
+        typeof obj.cuil === 'string'
+      );
+    }
+
+    function isAttendeeDtoArray(arr: any): arr is AttendeeDto[] {
+      return Array.isArray(arr) && arr.every(isAttendeeDto);
+    }
+
+    if (payment) {
+      this.logger.debug('Decodificando metadataToken de la orden para obtener asistentes...');
+      const decoded: any = this.jwtService.decodeMetadata(String(order.metadataToken));
+
+      if (!decoded || !('attendees' in decoded) || !isAttendeeDtoArray(decoded.attendees)) {
+        this.logger.error('Formato inválido de asistentes en metadataToken.');
+        return 'ERROR';
+      }
+
+      const attendees: AttendeeDto[] = decoded.attendees;
+      this.logger.debug(`Se encontraron ${attendees.length} asistentes para registrar.`);
+
+      for (const attendee of attendees) {
+        await this.prisma.invitee.create({
+          data: {
+            name: attendee.name,
+            cuil: attendee.cuil,
+            orderId: order.id,
+            paymentId: payment.id,
+          },
+        });
+        this.logger.debug(`Invitee creado: ${attendee.name} (${attendee.cuil})`);
+      }
+
+      this.logger.log(`Se crearon ${attendees.length} asistentes para la orden ID=${order.id}`);
+    }
+
+    this.logger.log('Notificación procesada correctamente.');
     return 'OK';
   }
-   async getPaymentsBetweenDates(begin: string, end: string): Promise<any> {
+
+  async getPaymentsBetweenDates(begin: string, end: string): Promise<any> {
     const url = `${this.BASE_URL}?range=date_created&begin_date=${begin}&end_date=${end}`;
 
     const headers = {

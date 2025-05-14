@@ -1,6 +1,6 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import { IsEnum, IsInt, IsNotEmpty } from "class-validator";
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString } from "class-validator";
 import { PaymentType } from '@prisma/client'; 
 
 export class CreateOrderDto {
@@ -17,4 +17,7 @@ export class CreateOrderDto {
   @IsNotEmpty()
   @IsInt()
   eventId: string; 
+  @IsOptional()
+  @IsString()
+  preferenceId?:string
 }

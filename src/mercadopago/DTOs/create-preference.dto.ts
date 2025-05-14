@@ -1,13 +1,14 @@
 /* eslint-disable prettier/prettier */
-import { IsString, IsEmail, IsNumber, IsArray, IsOptional, ValidateNested } from 'class-validator';
+import { IsString, IsEmail, IsNumber, IsArray, IsOptional, ValidateNested, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 
-class AttendeeDto {
+export class AttendeeDto {
   @IsString()
   name: string;
 
   @IsString()
-  dni: string;
+  @Matches(/^\d{7,11}$/) // opcional, valida formato de CUIL
+  cuil: string;
 }
 
 export class CreatePreferenceDto {
@@ -16,8 +17,9 @@ export class CreatePreferenceDto {
 
   @IsEmail()
   email: string;
-  @IsNumber()
-  cuil:string
+  @IsString()
+  @Matches(/^\d{7,11}$/)
+  cuil: string;
 
   @IsString()
   title: string;
@@ -45,5 +47,5 @@ export class CreatePreferenceDto {
 
   @IsOptional()
   @IsString()
-  userId?:string
+  userId?: string
 }

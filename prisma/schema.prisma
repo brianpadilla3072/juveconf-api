@@ -123,7 +123,7 @@ model Order {
   paymentType       PaymentType
   externalReference String? @unique
   metadataToken     String?
-
+  preferenceId      String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   deletedAt         DateTime?
@@ -160,14 +160,13 @@ model Payment {
 model Invitee {
   id              String        @id @default(uuid())
   name            String
-  dni             String
-
+  cuil             String
   orderId         String?
   order           Order?        @relation(fields: [orderId], references: [id])
-
   paymentId       String?
   payment         Payment?      @relation(fields: [paymentId], references: [id])
-
+  attendedDay1    Boolean    @default(false)
+  attendedDay2    Boolean    @default(false)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?
