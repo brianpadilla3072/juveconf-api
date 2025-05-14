@@ -41,6 +41,9 @@
 - Verifica que la notificación proviene de Mercado Pago.
 - Si es válida, agrega los invitados incluidos en la metadata a la base de datos.
 
+
+$ curl --url "smtp://smtp.zoho.com:587" --ssl-reqd --mail-from "equipo@consagradosajesus.com" --mail-rcpt "brianpadilla.work@gmail.com" --upload-file correo.txt --user "equipo@consagradosajesus.com:1XQQUrz8QgLV" --insecure
+
 ---
 
 ## 3. Flujo de Transferencia Bancaria
