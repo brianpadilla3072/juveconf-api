@@ -18,7 +18,10 @@ async function bootstrap() {
    app.useGlobalPipes(new ValidationPipe({
     transform: true,
     whitelist: true,
+      transformOptions: { enableImplicitConversion: true },
+
   }));
+
   app.enableCors({ origin: '*' });
   const config = new DocumentBuilder()
     .setTitle('Consagrados a Jesus')

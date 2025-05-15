@@ -294,22 +294,56 @@ async createPreference(dto: CreatePreferenceDto): Promise<string> {
     return 'OK';
   }
 
-  async getPaymentsBetweenDates(begin: string, end: string): Promise<any> {
-    const url = `${this.BASE_URL}?range=date_created&begin_date=${begin}&end_date=${end}`;
+async getPaymentsByDateRange(
+  begin: string,
+  end: string,
+): Promise<any> {
+  const url = `${this.BASE_URL}` +
+    `?range=date_created` +
+    `&begin_date=${encodeURIComponent(begin)}` +
+    `&end_date=${encodeURIComponent(end)}`;
 
+  const headers = {
+    Authorization: `Bearer ${this.mpConfig.accessToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  const response = await firstValueFrom(
+    this.http.get(url, { headers }),
+  );
+  return response.data; 
+}
+async getCollectorId(): Promise<number> {
+  const url = 'https://api.mercadopago.com/users/me';
+  const headers = {
+    Authorization: `Bearer ${this.mpConfig.accessToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  try {
+    const response$ = this.http.get(url, { headers });
+    const response = await firstValueFrom(response$);
+    
+    const collectorId = response.data.id;
+    return collectorId;
+  } catch (error) {
+    throw new CustomError(500, 'Error al obtener collector ID', 'Hubo un problema al consultar la cuenta de MercadoPago.');
+  }
+}
+async getPaymentById(paymentId: string): Promise<any> {
+    const url = `https://api.mercadopago.com/v1/payments/${paymentId}`;
     const headers = {
       Authorization: `Bearer ${this.mpConfig.accessToken}`,
       'Content-Type': 'application/json',
     };
 
     try {
-      const response = await firstValueFrom(
-        this.http.get(url, { headers })
-      );
+      const response$ =  this.http.get(url, { headers });
+      const response = await firstValueFrom(response$);
       return response.data;
-    } catch (error) {
-      console.error('Error al consultar pagos en Mercado Pago:', error.response?.data || error.message);
-      throw error;
+    } catch (error: any) {
+      throw new Error(`Error al obtener el pago con ID ${paymentId}: ${error.message}`);
     }
   }
+
 }

@@ -7,7 +7,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, Logger } from '@nestjs/common';
 import { MercadopagoService } from 'src/mercadopago/mercadopago.service';
-import { JwtService } from 'src/jwt/jwt.service';
 import { OrdersService } from 'src/orders/orders.service';
 
 @Injectable()
@@ -16,56 +15,31 @@ export class TransfersService {
 
   constructor(
     private readonly mpService: MercadopagoService,
-    private readonly jwtService: JwtService,
     private readonly ordersService: OrdersService,
   ) {}
 
-  private includesCuil(token: string, cuil: string): boolean {
-    try {
-      const decoded = this.jwtService.verifyMetadata(token);
-      return decoded?.cuil === cuil;
-    } catch (err) {
-      this.logger.warn(`[includesCuil] Error verificando token: ${err.message}`);
-      return false;
-    }
-  }
+ 
 
- async getPendingTransfers(begin: string, end: string, cuil: string) {
-  this.logger.log(`[TransfersService] Buscando pagos entre ${begin} y ${end} para CUIL: ${cuil}`);
+ async getApprovedTransfers(begin: string, end: string, cuil: string) {
 
-  const data = await this.mpService.getPaymentsBetweenDates(begin, end);
+  this.logger.log(
+    `[TransfersService] Buscando aprobadas entre ${begin} y ${end} para CUIL: ${cuil}`
+  );
+  const collectoid = await this.mpService.getCollectorId()
+  const data = await this.mpService.getPaymentsByDateRange(begin, end);
   const orders = await this.ordersService.getOrdersByCuil(cuil);
-
-  this.logger.log(`[TransfersService] Total de pagos obtenidos: ${data.results?.length}`);
-
-  const transfers = data.results
-    .map((payment) => {
-      const token = payment.metadata?.token || '';
-      const decoded = this.includesCuil(token, cuil) ? this.jwtService.verifyMetadata(token) : null;
-      return decoded ? { ...payment, decodedMetadata: decoded } : null;
-    })
-    .filter(Boolean);
-
-  this.logger.log(`[TransfersService] Total de transferencias filtradas: ${transfers.length}`);
-
-  const arrorders = Array.isArray(orders)
-    ? orders
-        .map((order) => {
-          const token = order.metadataToken || '';
-          const decoded = this.includesCuil(token, cuil) ? this.jwtService.verifyMetadata(token) : null;
-          return decoded ? { ...order, decodedMetadata: decoded } : null;
-        })
-        .filter(Boolean)
-    : [];
-
-  this.logger.log(`[TransfersService] Total de órdenes filtradas: ${arrorders.length}`);
-
-  return {
-    orders: arrorders,
-    transfers: transfers,
-  };
+  const transferenciasEntrantesReales = data.results.filter(t =>
+  t.operation_type === "money_transfer" &&
+  t.collector_id === collectoid &&
+  t.status === 'approved');
+  return { orders: orders, transfers: transferenciasEntrantesReales };
+  //http://localhost:3072/transfers/approved?begin=2025-04-05T00:00:00.000Z&end=2025-04-07T23:59:59.000Z&cuil=27948995854
+}
+async getPaymentInMercadoPago(id:string){
+  return await this.mpService.getPaymentById(id)
+  //http://localhost:3072/transfers/payment/107129823165
 }
 
 
+
 }
-//http://localhost:3072/transfers/pending?begin=2025-05-01T00:00:00Z&end=2025-05-11T23:59:59Z&cuil=20424695794
