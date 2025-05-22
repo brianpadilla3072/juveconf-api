@@ -50,92 +50,89 @@ export class MercadopagoService {
     this.paymentClient = new Payment(this.mpConfig);
   }
 
-async createPreference(dto: CreatePreferenceDto): Promise<string> {
-  // 1) Obtener combo y payload para validaciones
-  const combo = await this.combosService.findOne(dto.id);
-  if (!combo) throw new CustomError(404, 'Combo no encontrado', 'No pudimos encontrar el combo solicitado.');
+  async createPreference(dto: CreatePreferenceDto): Promise<string> {
+    // 1) Obtener combo y payload para validaciones
+    const combo = await this.combosService.findOne(dto.id);
+    if (!combo) throw new CustomError(404, 'Combo no encontrado', 'No pudimos encontrar el combo solicitado.');
 
-  const payloadForCheck = { comboId: dto.id, email: dto.email, cuil: dto.cuil };
+    const payloadForCheck = { comboId: dto.id, email: dto.email, cuil: dto.cuil };
 
-  // 2) Validar órdenes pendientes
-  const pendingOrders = await this.prisma.order.findMany({
-    where: { status: OrderStatus.PENDING, paymentType: PaymentType.MERCADOPAGO, eventId: dto.eventId }
-  });
-  for (const order of pendingOrders) {
-    if (!order.metadataToken) continue;
-    let existing: Record<string, any> | null;
-    try {
-      existing = this.jwtService.verifyMetadata(order.metadataToken);
-    } catch {
-      continue;
+    // 2) Validar órdenes pendientes
+    const pendingOrders = await this.prisma.order.findMany({
+      where: { status: OrderStatus.PENDING, paymentType: PaymentType.MERCADOPAGO, eventId: dto.eventId }
+    });
+    for (const order of pendingOrders) {
+      if (!order.metadataToken) continue;
+      let existing: Record<string, any> | null;
+      try {
+        existing = this.jwtService.verifyMetadata(order.metadataToken);
+      } catch {
+        continue;
+      }
+      if (!existing) continue;
+      if (
+        existing.comboId === payloadForCheck.comboId &&
+        existing.email === payloadForCheck.email &&
+        existing.cuil === payloadForCheck.cuil
+      ) {
+        throw new CustomError(400, 'Ya existe una orden pendiente', 'Ya existe una orden pendiente para este combo con este email y CUIL.');
+      }
     }
-    if (!existing) continue;
-    if (
-      existing.comboId === payloadForCheck.comboId &&
-      existing.email === payloadForCheck.email &&
-      existing.cuil === payloadForCheck.cuil
-    ) {
-      throw new CustomError(400, 'Ya existe una orden pendiente', 'Ya existe una orden pendiente para este combo con este email y CUIL.');
-    }
-  }
 
-  // 3) Transacción: crear orden, token con orderId, preferencia y actualizar orden
-  return await this.prisma.$transaction(async (tx) => {
-    // 3.1) Crear orden pendiente (sin token ni referencia externa)
-    const totalAmount = combo.price * combo.minPersons;
-    const order = await tx.order.create({
-      data: {
-        year: new Date().getFullYear(),
-        userId: dto.userId,
+    // 3) Transacción: crear orden, token con orderId, preferencia y actualizar orden
+    return await this.prisma.$transaction(async (tx) => {
+      // 3.1) Crear orden pendiente (sin token ni referencia externa)
+      const totalAmount = combo.price * combo.minPersons;
+      const order = await tx.order.create({
+        data: {
+          year: new Date().getFullYear(),
+          userId: dto.userId,
+          eventId: dto.eventId,
+          total: totalAmount,
+          status: OrderStatus.PENDING,
+          paymentType: PaymentType.MERCADOPAGO,
+          combos: { connect: [{ id: combo.id }] },
+        },
+      });
+
+      // 3.2) Generar token de metadata incluyendo el id de la orden
+      const metadataPayload = {
+        orderId: order.id,
+        userId: dto.userId || null,
         eventId: dto.eventId,
-        total: totalAmount,
-        status: OrderStatus.PENDING,
-        paymentType: PaymentType.MERCADOPAGO,
-        combos: { connect: [{ id: combo.id }] },
-      },
+        comboId: combo.id,
+        quantity: dto.quantity,
+        email: dto.email,
+        cuil: dto.cuil,
+        totalAmount,
+        currency: 'ARS',
+        attendees: dto.attendees,
+      };
+      const metadataToken = this.jwtService.signMetadata(metadataPayload);
+
+      // 3.3) Crear preferencia en MercadoPago
+      const preferenceRequest = {
+        items: [{ id: combo.id, title: combo.name, unit_price: combo.price, quantity: combo.minPersons }],
+        metadata: { token: metadataToken },
+        external_reference: String(order.id),
+      };
+      const preference = await new Preference(this.mpConfig).create({ body: preferenceRequest });
+      if (!preference?.id || !preference.init_point) {
+        throw new CustomError(500, 'Error en la creación de preferencia', 'No se pudo crear la preferencia de pago.');
+      }
+
+      // 3.4) Actualizar orden con metadataToken y externalReference
+      await tx.order.update({
+        where: { id: order.id },
+        data: { metadataToken, externalReference: preference.id },
+      });
+
+      return preference.init_point;
+    }).catch(error => {
+      if (error instanceof CustomError) throw error;
+      throw new CustomError(500, 'Error inesperado', 'Hubo un error inesperado. Por favor, intenta de nuevo.');
     });
-
-    // 3.2) Generar token de metadata incluyendo el id de la orden
-    const metadataPayload = {
-      orderId: order.id,
-      userId: dto.userId || null,
-      eventId: dto.eventId,
-      comboId: combo.id,
-      quantity: dto.quantity,
-      email: dto.email,
-      cuil: dto.cuil,
-      totalAmount,
-      currency: 'ARS',
-      attendees: dto.attendees,
-    };
-    const metadataToken = this.jwtService.signMetadata(metadataPayload);
-
-    // 3.3) Crear preferencia en MercadoPago
-    const preferenceRequest = {
-      items: [{ id: combo.id, title: combo.name, unit_price: combo.price, quantity: combo.minPersons }],
-      metadata: { token: metadataToken },
-      external_reference: String(order.id),
-    };
-    const preference = await new Preference(this.mpConfig).create({ body: preferenceRequest });
-    if (!preference?.id || !preference.init_point) {
-      throw new CustomError(500, 'Error en la creación de preferencia', 'No se pudo crear la preferencia de pago.');
-    }
-
-    // 3.4) Actualizar orden con metadataToken y externalReference
-    await tx.order.update({
-      where: { id: order.id },
-      data: { metadataToken, externalReference: preference.id },
-    });
-
-    return preference.init_point;
-  }).catch(error => {
-    if (error instanceof CustomError) throw error;
-    throw new CustomError(500, 'Error inesperado', 'Hubo un error inesperado. Por favor, intenta de nuevo.');
-  });
-}
-
-
-
+  }
   async processNotification(rawBody: string): Promise<'OK' | 'ERROR'> {
     this.logger.log('Iniciando procesamiento de notificación de pago...');
 
@@ -194,7 +191,7 @@ async createPreference(dto: CreatePreferenceDto): Promise<string> {
       return 'ERROR';
     }
     console.log(payload);
-    
+
     // 5) Buscar y actualizar orden interna
     this.logger.debug(`Buscando orden con externalReference: ${data.preference_id}`);
     const order = await this.prisma.order.findUnique({
@@ -233,7 +230,7 @@ async createPreference(dto: CreatePreferenceDto): Promise<string> {
     // 6) Registrar pago
     this.logger.debug('Registrando pago en base de datos...');
     console.log(mpPayment);
-    
+
     const payment = await this.prisma.payment.create({
       data: {
         year: new Date().getFullYear(),
@@ -242,9 +239,9 @@ async createPreference(dto: CreatePreferenceDto): Promise<string> {
         type: PaymentType.MERCADOPAGO,
         externalReference: String(mpPayment.id),
         userId: payload.userId,
-        payerEmail: mpPayment.payer?.email ||payload.metadata?.email,
+        payerEmail: mpPayment.payer?.email || payload.metadata?.email,
         payerName: ` ${mpPayment.payer?.first_name} ${mpPayment.payer?.last_name} -${mpPayment.payer?.email} - phone ${mpPayment.payer?.phone.number} - ${mpPayment.payer?.identification.number} ${mpPayment.payer?.identification.type}`,
-        payerDni: String(mpPayment.payer?.identification.number ||  payload.metadata?.cuil) ,
+        payerDni: String(mpPayment.payer?.identification.number || payload.metadata?.cuil),
       },
     });
     this.logger.debug(`Pago registrado: ID=${payment.id}`);
@@ -293,44 +290,43 @@ async createPreference(dto: CreatePreferenceDto): Promise<string> {
     this.logger.log('Notificación procesada correctamente.');
     return 'OK';
   }
+  async getPaymentsByDateRange(
+    begin: string,
+    end: string,
+  ): Promise<any> {
+    const url = `${this.BASE_URL}` +
+      `?range=date_created` +
+      `&begin_date=${encodeURIComponent(begin)}` +
+      `&end_date=${encodeURIComponent(end)}`;
 
-async getPaymentsByDateRange(
-  begin: string,
-  end: string,
-): Promise<any> {
-  const url = `${this.BASE_URL}` +
-    `?range=date_created` +
-    `&begin_date=${encodeURIComponent(begin)}` +
-    `&end_date=${encodeURIComponent(end)}`;
+    const headers = {
+      Authorization: `Bearer ${this.mpConfig.accessToken}`,
+      'Content-Type': 'application/json',
+    };
 
-  const headers = {
-    Authorization: `Bearer ${this.mpConfig.accessToken}`,
-    'Content-Type': 'application/json',
-  };
-
-  const response = await firstValueFrom(
-    this.http.get(url, { headers }),
-  );
-  return response.data; 
-}
-async getCollectorId(): Promise<number> {
-  const url = 'https://api.mercadopago.com/users/me';
-  const headers = {
-    Authorization: `Bearer ${this.mpConfig.accessToken}`,
-    'Content-Type': 'application/json',
-  };
-
-  try {
-    const response$ = this.http.get(url, { headers });
-    const response = await firstValueFrom(response$);
-    
-    const collectorId = response.data.id;
-    return collectorId;
-  } catch (error) {
-    throw new CustomError(500, 'Error al obtener collector ID', 'Hubo un problema al consultar la cuenta de MercadoPago.');
+    const response = await firstValueFrom(
+      this.http.get(url, { headers }),
+    );
+    return response.data;
   }
-}
-async getPaymentById(paymentId: string): Promise<any> {
+  async getCollectorId(): Promise<number> {
+    const url = 'https://api.mercadopago.com/users/me';
+    const headers = {
+      Authorization: `Bearer ${this.mpConfig.accessToken}`,
+      'Content-Type': 'application/json',
+    };
+
+    try {
+      const response$ = this.http.get(url, { headers });
+      const response = await firstValueFrom(response$);
+
+      const collectorId = response.data.id;
+      return collectorId;
+    } catch (error) {
+      throw new CustomError(500, 'Error al obtener collector ID', 'Hubo un problema al consultar la cuenta de MercadoPago.');
+    }
+  }
+  async getPaymentById(paymentId: number): Promise<any> {
     const url = `https://api.mercadopago.com/v1/payments/${paymentId}`;
     const headers = {
       Authorization: `Bearer ${this.mpConfig.accessToken}`,
@@ -338,7 +334,7 @@ async getPaymentById(paymentId: string): Promise<any> {
     };
 
     try {
-      const response$ =  this.http.get(url, { headers });
+      const response$ = this.http.get(url, { headers });
       const response = await firstValueFrom(response$);
       return response.data;
     } catch (error: any) {

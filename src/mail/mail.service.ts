@@ -5,7 +5,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { Injectable, Logger } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
-import { UserCreatedTemplate, PaymentReceivedTemplate, TicketDetailsTemplate, ResetPasswordTemplate, WelcomeMessageTemplate, EventConfirmationTemplate } from './templates'; // Importar las plantillas
+import { UserCreatedTemplate, PaymentReceivedTemplate, TicketDetailsTemplate, ResetPasswordTemplate } from './templates'; // Importar las plantillas
 import { EmailTemplate } from './templates';
 @Injectable()
 export class MailService {
@@ -54,8 +54,7 @@ export class MailService {
       paymentReceived: new PaymentReceivedTemplate(),
       ticketDetails: new TicketDetailsTemplate(),
       resetPassword: new ResetPasswordTemplate(),
-      welcomeMessage: new WelcomeMessageTemplate(),
-      eventConfirmation: new EventConfirmationTemplate(),
+   
     };
 
     const template = templates[templateName];

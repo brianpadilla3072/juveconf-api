@@ -7,7 +7,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable prettier/prettier */
-import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
 import { MercadopagoService } from './mercadopago.service';
 import { CreatePreferenceDto } from './DTOs/create-preference.dto';
 
@@ -27,5 +27,17 @@ export class MercadopagoController {
   async handleNotification(@Req() req: any) {
     const result = await this.mpService.processNotification(req.rawBody.toString());
     return result;
+  }
+    @Get('movements')
+  async getLast20DaysPayments() {
+    const today = new Date();
+    const pastDate = new Date(today);
+    pastDate.setDate(today.getDate() - 20);
+
+    const begin = pastDate.toISOString();
+    const end = today.toISOString();
+
+    const payments = await this.mpService.getPaymentsByDateRange(begin, end);
+    return payments;
   }
 }

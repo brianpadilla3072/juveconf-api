@@ -1,8 +1,9 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable prettier/prettier */
-import { Body, Controller, Get, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import { TransfersService } from './transfers.service';
+import { CreatePreferenceDto } from 'src/mercadopago/DTOs/create-preference.dto';
 
 @Controller('transfers')
 export class TransfersController {
@@ -16,12 +17,25 @@ export class TransfersController {
   ) {
     return this.transfersService.getApprovedTransfers(begin, end, cuil);
   }
-  @Get('payment/:id')
-getPaymentById(
-  @Param('id') id: string,
-) {
-  return this.transfersService.getPaymentInMercadoPago(id);
-}
 
+  @Get('verifyTransferMercadoPago')
+  verifyTransfer( 
+    @Body('orderId') orderId : string,
+    @Body('paymentId') paymentId :number) {
+      return this.transfersService.verifyTransferDeMercadoPago( paymentId, orderId)
+  }
+  @Get('verifyTransferDeOtrasPlataformas')
+  verifyTransferDeOtrasPlataformas( 
+    @Body('orderId') orderId : string,
+    @Body('paymentId') paymentId :string) {
+      return this.transfersService.verifyTransferDeOtrasPlataformas( paymentId, orderId)
+  }
+   @Post('create-transfer-order')
+  @HttpCode(HttpStatus.CREATED)
+  async createTransferOrder(
+    @Body() dto: CreatePreferenceDto,
+  ){
+    return this.transfersService.createTransferOrder(dto);
+  }
 }
 
