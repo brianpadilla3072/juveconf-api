@@ -142,7 +142,8 @@ export class TransfersService {
       if (error instanceof CustomError) throw error;
       throw new CustomError(500, 'Error inesperado', 'Hubo un error al crear la orden de transferencia.');
     }
-
+    // 4) Enviar confirmacion
+    
     console.log('[createTransferOrder] Orden de transferencia creada con éxito.');
     return { success: true };
   }
