@@ -6,14 +6,14 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, Logger } from '@nestjs/common';
-import { PaymentType } from '@prisma/client';
+import { Order, PaymentType } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
 import { CustomError } from 'src/global/CustomError';
 import { JwtService } from 'src/jwt/jwt.service';
 import { AttendeeDto, CreatePreferenceDto } from 'src/mercadopago/DTOs/create-preference.dto';
 import { MercadopagoService } from 'src/mercadopago/mercadopago.service';
 import { OrdersService, OrderStatus } from 'src/orders/orders.service';
-
+import { MailService } from 'src/mail/mail.service';
 @Injectable()
 export class TransfersService {
   private readonly logger = new Logger(TransfersService.name);
@@ -23,7 +23,7 @@ export class TransfersService {
     private readonly ordersService: OrdersService,
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-
+    private readonly mailService: MailService
   ) { }
 
 
@@ -95,8 +95,8 @@ export class TransfersService {
         );
       }
     }
-
-    // 3) Crear orden dentro de transacción
+    let email:string ="";
+    let createdOrder: Order | null = null;    // 3) Crear orden dentro de transacción
     try {
       await this.prisma.$transaction(async (tx) => {
         const totalAmount = combo.price * combo.minPersons;
@@ -127,6 +127,7 @@ export class TransfersService {
           currency: 'ARS',
           attendees: dto.attendees,
         };
+        email = metadataPayload.email
 
         const metadataToken = this.jwtService.signMetadata(metadataPayload);
         console.log('[createTransferOrder] Metadata token generado.');
@@ -135,6 +136,7 @@ export class TransfersService {
           where: { id: order.id },
           data: { metadataToken },
         });
+        createdOrder = order;
         console.log('[createTransferOrder] Orden actualizada con metadata.');
       });
     } catch (error) {
@@ -143,7 +145,55 @@ export class TransfersService {
       throw new CustomError(500, 'Error inesperado', 'Hubo un error al crear la orden de transferencia.');
     }
     // 4) Enviar confirmacion
-    
+    const template = `<!DOCTYPE html>
+        <html lang="es">
+          <head>
+            <meta charset="UTF-8" />
+            <title>Confirmar Transferencia</title>
+          </head>
+          <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; padding: 20px 0;">
+              <tr>
+                <td align="center">
+                  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; padding: 30px; box-shadow: 0 0 5px rgba(0,0,0,0.1);">
+                    <tr>
+                      <td align="center" style="padding-bottom: 20px;">
+                        <h1 style="color: #2c3e50; margin: 0;">¡Gracias por tu compra!</h1>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center" style="padding: 10px 0;">
+                        <p style="font-size: 16px; color: #333333; margin: 0;">El ID de tu orden es:</p>
+                        <p style="font-size: 16px; font-weight: bold; color: #f76f1f; word-break: break-word; margin: 5px 0 20px;">${createdOrder!.id}</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center">
+                        <p style="font-size: 16px; color: #333333; margin: 0 0 20px;">Dale clic al botón para continuar con la verificación:</p>
+                        <a href="https://tusitio.com/verificar?id=123e4567-e89b-12d3-a456-426614174000"
+                          style="background-color: #f76f1f; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 5px; display: inline-block; font-size: 16px; margin-top: 10px;">
+                          Confirmar Transferencia
+                        </a>
+                        <p style="font-size: 14px; color: #555555; margin-top: 20px;">
+                          O hacé clic en este enlace si el botón no funciona:<br />
+                          <a href="https://tusitio.com/verificar?id=${createdOrder!.id}"
+                            style="color: #2980b9; text-decoration: underline;">https://tusitio.com/verificar?id=${createdOrder!.id}</a>
+                        </p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center" style="padding-top: 30px;">
+                        <p style="font-size: 12px; color: #999999;">Este mensaje fue generado automáticamente. Por favor no respondas este correo.</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+        </html>
+        `
+      await this.mailService.sendCustomEmail(email,template,`INICIAR VERIFICACION DE ORDEN: ${createdOrder!.id} `)
     console.log('[createTransferOrder] Orden de transferencia creada con éxito.');
     return { success: true };
   }
