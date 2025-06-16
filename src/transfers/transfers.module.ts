@@ -8,10 +8,12 @@ import { PrismaService } from 'prisma/prisma.service';
 import { JwtService } from 'src/jwt/jwt.service';
 import { CombosService } from 'src/combos/combos.service';
 import { OrdersService } from 'src/orders/orders.service';
+import { MailModule } from 'src/mail/mail.module';
+import { MailService } from 'src/mail/mail.service';
 
 @Module({
-  imports: [HttpModule],
+  imports: [HttpModule,MailModule],
   controllers: [TransfersController],
-  providers: [TransfersService, MercadopagoService, PrismaService, JwtService,CombosService,OrdersService],
+  providers: [TransfersService, MercadopagoService, PrismaService, JwtService,CombosService,OrdersService,MailService],
 })
 export class TransfersModule {}
