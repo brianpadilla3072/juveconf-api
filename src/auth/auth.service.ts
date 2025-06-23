@@ -1,14 +1,12 @@
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-// eslint-disable-next-line prettier/prettier
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { PasswordService } from '../global/password.service'; // Este es el servicio para manejar las contraseñas
-import { JwtService } from '@nestjs/jwt'; // Si deseas usar JWT en el futuro
+import { PasswordService } from '../global/password.service';
+import { JwtService } from '@nestjs/jwt';
+import { RegisterUserDto } from './DTOs/register-user.dto';
 
 @Injectable()
 export class AuthService {
@@ -25,13 +23,18 @@ export class AuthService {
     });
 
     if (!user) {
-      return false;  // Usuario no encontrado
+      return false; // Usuario no encontrado
     }
     if (!user.password) {
-    throw new UnauthorizedException('El usuario no tiene contraseña local asignada.');
-}
+      throw new UnauthorizedException(
+        'El usuario no tiene contraseña local asignada.',
+      );
+    }
     // Compara la contraseña en texto claro con la contraseña cifrada
-    const isPasswordValid = await this.passwordService.comparePasswords(password, user.password);
+    const isPasswordValid = await this.passwordService.comparePasswords(
+      password,
+      user.password,
+    );
 
     return isPasswordValid;
   }
@@ -47,5 +50,55 @@ export class AuthService {
     // Aquí generas el token JWT, puedes incluir más datos si lo necesitas
     const payload = { email };
     return this.jwtService.sign(payload); // Devuelve el token
+  }
+
+  // Método para registrar un nuevo usuario
+  async register(
+    registerUserDto: RegisterUserDto,
+  ): Promise<{ access_token: string }> {
+    // Verificar si el email ya está en uso
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: registerUserDto.email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('El correo electrónico ya está en uso');
+    }
+
+    // Verificar si el DNI ya está en uso
+    const existingDni = await this.prisma.user.findUnique({
+      where: { dni: registerUserDto.dni },
+    });
+
+    if (existingDni) {
+      throw new ConflictException('El DNI ya está registrado');
+    }
+
+    // Hashear la contraseña
+    const hashedPassword = await this.passwordService.hashPassword(
+      registerUserDto.password,
+    );
+
+    // Crear el usuario en la base de datos
+    const user = await this.prisma.user.create({
+      data: {
+        ...registerUserDto,
+        password: hashedPassword,
+        provider: 'LOCAL',
+        emailVerified: false, // Podrías querer enviar un correo de verificación
+      },
+    });
+
+    // Generar token JWT
+    const payload = { email: user.email, sub: user.id };
+    const access_token = this.jwtService.sign(payload);
+
+    return { access_token };
+  }
+
+  async getUserProfile(email: string): Promise<any> {
+    return this.prisma.user.findUnique({
+      where: { email },
+    });
   }
 }

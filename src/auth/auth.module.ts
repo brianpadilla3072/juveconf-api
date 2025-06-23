@@ -1,22 +1,28 @@
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controler';
 import { AuthService } from './auth.service';
-import { PasswordService } from '../global/password.service';  // Asegúrate de incluir el PasswordService
-import { PrismaService } from 'prisma/prisma.service';  // PrismaService para interactuar con la base de datos
-import { JwtModule } from '@nestjs/jwt'; // Si deseas utilizar JWT
+import { PasswordService } from '../global/password.service';
+import { PrismaService } from 'prisma/prisma.service';
+import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
-    JwtModule.register({
-      secret: 'yourSecretKey', // Coloca tu clave secreta aquí o usa variables de entorno
-      signOptions: { expiresIn: '60m' }, // Configura el tiempo de expiración del token
+    ConfigModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get('JWT_SECRET') || 'yourSecretKey',
+        signOptions: { expiresIn: '60m' },
+      }),
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordService, PrismaService],
+  providers: [AuthService, PasswordService, PrismaService, JwtStrategy],
+  exports: [JwtStrategy, PassportModule, JwtModule],
 })
 export class AuthModule {}
