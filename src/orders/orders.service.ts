@@ -9,8 +9,7 @@
 /* eslint-disable prettier/prettier */
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { Order, PaymentType } from '@prisma/client';
-import { OrderStatus } from './enums/order-status.enum';
+import { Order, PaymentType, OrderStatus } from '@prisma/client';
 import { JwtService } from 'src/jwt/jwt.service';
 
 @Injectable()
@@ -49,7 +48,7 @@ export class OrdersService {
         eventId: combo.eventId,
         year,
         total,
-        status: 'pending',
+        status: OrderStatus.PENDING,
         paymentType,
         metadataToken,
         combos: {
@@ -105,7 +104,7 @@ export class OrdersService {
 
     // Obtener todas las órdenes
     const orders = await this.prisma.order.findMany({
-      where: { status: 'pending' , paymentType:PaymentType.TRANSFER}, // Puedes agregar más filtros si lo necesitas
+      where: { status: OrderStatus.PENDING, paymentType: PaymentType.TRANSFER },
     });
 
 
@@ -127,6 +126,21 @@ export class OrdersService {
 
 
     return filteredOrders;  // Retornar las órdenes filtradas
+  }
+  async getOrdersByStatus(status: OrderStatus) {
+    return this.prisma.order.findMany({
+      where: { status },
+      include: {
+        user: true,
+        event: true,
+        combos: true,
+        payments: true,
+        invitees: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
   }
 }
 export { OrderStatus };

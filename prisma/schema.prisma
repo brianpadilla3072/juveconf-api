@@ -20,6 +20,11 @@ enum UserRole {
   COLLABORATOR
   USER
 }
+enum OrderStatus {
+  PENDING
+  REVIEW
+  PAID
+}
 
 enum PaymentType {
   TRANSFER
@@ -119,7 +124,7 @@ model Order {
   combos            Combo[]      // Relación many-to-many implícita
 
   total             Float
-  status            String       @default("pending")
+  status            OrderStatus       @default(PENDING)
   paymentType       PaymentType
   externalReference String? @unique
   metadataToken     String?

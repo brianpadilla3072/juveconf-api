@@ -208,13 +208,10 @@ export class MercadopagoService {
     let newStatus: OrderStatus;
     switch (mpPayment.status) {
       case 'approved':
-        newStatus = OrderStatus.APPROVED;
+        newStatus = OrderStatus.PAID;
         break;
       case 'pending':
         newStatus = OrderStatus.PENDING;
-        break;
-      case 'rejected':
-        newStatus = OrderStatus.REJECTED;
         break;
       default:
         this.logger.warn(`Estado de pago no manejado: ${mpPayment.status}`);

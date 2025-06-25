@@ -1,3 +1,10 @@
+
+# Seed
+
+```bash
+npx ts-node prisma/seed.ts
+```
+
 # Referencia
 
 - [Panel de Desarrolladores de Mercado Pago](https://www.mercadopago.com.ar/developers/panel/app)

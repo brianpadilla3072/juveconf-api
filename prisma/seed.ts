@@ -1,16 +1,51 @@
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-misused-promises */
-/* eslint-disable prettier/prettier */
-import { PrismaClient, UserRole, AuthProvider, PaymentType } from '@prisma/client';
+// Configuración de TypeScript para el seed
+import { UserRole, PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+
+interface UserSeedData {
+  email: string;
+  password: string;
+  dni: string;
+  name: string;
+  givenName?: string;
+  familyName?: string;
+  picture?: string;
+  locale?: string;
+  role: UserRole;
+}
 
 const prisma = new PrismaClient();
 
+// Función para hashear contraseñas
+async function hashPassword(password: string): Promise<string> {
+  const saltRounds = 10;
+  return bcrypt.hash(password, saltRounds);
+}
+
+// Crear usuario directamente en la base de datos
+async function createUser(userData: UserSeedData) {
+  const hashedPassword = await hashPassword(userData.password);
+  return prisma.user.upsert({
+    where: { email: userData.email },
+    update: {},
+    create: {
+      email: userData.email,
+      password: hashedPassword,
+      dni: userData.dni,
+      name: userData.name,
+      givenName: userData.givenName,
+      familyName: userData.familyName,
+      picture: userData.picture,
+      locale: userData.locale,
+      role: userData.role,
+      provider: 'LOCAL',
+      emailVerified: false,
+    },
+  });
+}
+
 async function seedUsers() {
-  const users = [
+  const users: UserSeedData[] = [
     {
       email: 'brisgabella@gmail.com',
       password: 'consagradosBri2025',
@@ -18,12 +53,8 @@ async function seedUsers() {
       name: 'Brisa',
       givenName: 'Brisa',
       familyName: 'Gabella',
-      nickname: 'brigi',
       picture: 'https://example.com/brisa.jpg',
       locale: 'es-AR',
-      emailVerified: true,
-      provider: AuthProvider.LOCAL,
-      auth0Id: null,
       role: UserRole.ADMIN,
     },
     {
@@ -33,35 +64,38 @@ async function seedUsers() {
       name: 'Estefania',
       givenName: 'Estefania',
       familyName: 'Vazquez',
-      nickname: 'estefi',
       picture: 'https://example.com/estefania.jpg',
       locale: 'es-AR',
-      emailVerified: true,
-      provider: AuthProvider.LOCAL,
-      auth0Id: null,
       role: UserRole.ADMIN,
     },
   ];
 
-  for (const u of users) {
-    await prisma.user.upsert({
-      where: { email: u.email },
-      update: {}, // no actualizamos si ya existe
-      create: {
-        ...u,
-        // deletedAt se omite para mantenerlo en null
-      },
-    });
-    console.log(`Usuario seed: ${u.email} (asegurado)`);
+  for (const user of users) {
+    try {
+      await createUser(user);
+      console.log(`Usuario registrado: ${user.email}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(
+          `Error registrando usuario ${user.email}:`,
+          error.message,
+        );
+      } else {
+        console.error(
+          `Error desconocido registrando usuario ${user.email}:`,
+          String(error),
+        );
+      }
+    }
   }
 }
 
 async function seedCombos(eventId: string) {
   const PRICE_PLANS = [
-    { id: "individual", name: "Individual", minPersons: 1, price: 50 },
-    { id: "small-group", name: "Grupo Pequeño", minPersons: 5, price: 40 },
-    { id: "medium-group", name: "Grupo Mediano", minPersons: 6, price: 35 },
-    { id: "large-group", name: "Grupo Grande", minPersons: 10, price: 30 },
+    { id: 'individual', name: 'Individual', minPersons: 1, price: 50 },
+    { id: 'small-group', name: 'Grupo Pequeño', minPersons: 5, price: 40 },
+    { id: 'medium-group', name: 'Grupo Mediano', minPersons: 6, price: 35 },
+    { id: 'large-group', name: 'Grupo Grande', minPersons: 10, price: 30 },
   ];
   const year = new Date().getFullYear();
 
@@ -96,22 +130,35 @@ async function seedEvent() {
   return event.id; // Retornamos el eventId
 }
 
+// Función principal
 async function main() {
-  try {
-    // Primero se crea el evento
-    const eventId = await seedEvent();
+  console.log('Iniciando seed...');
 
-    // Luego se crean los usuarios
+  try {
+    // 1. Crear usuarios
     await seedUsers();
 
-    // Finalmente, se crean los combos asociados al evento
+    // 2. Crear evento
+    const eventId = await seedEvent();
+
+    // 3. Crear combos
     await seedCombos(eventId);
+
+    console.log('Seed completado exitosamente');
   } catch (error) {
-    console.error(error);
+    if (error instanceof Error) {
+      console.error('Error durante el seed:', error.message);
+    } else {
+      console.error('Error desconocido durante el seed:', String(error));
+    }
     process.exit(1);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-main();
+// Ejecutar el seed
+main().catch((error) => {
+  console.error('Error inesperado en el seed:', error);
+  process.exit(1);
+});

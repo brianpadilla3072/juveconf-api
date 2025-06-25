@@ -228,17 +228,7 @@ export class TransfersService {
       this.logger.error(`Monto o moneda no coinciden`);
       return 'ERROR';
     }
-
-    const newStatus: OrderStatus = (() => {
-      switch (payment.status) {
-        case 'approved': return OrderStatus.APPROVED;
-        case 'pending': return OrderStatus.PENDING;
-        case 'rejected': return OrderStatus.REJECTED;
-        default:
-          this.logger.warn(`Estado de pago no manejado: ${payment.status}`);
-          return OrderStatus.PENDING;
-      }
-    })();
+    const newStatus: OrderStatus = OrderStatus.PAID;
 
     // Transacción completa
     return await this.prisma.$transaction(async (tx) => {
@@ -358,18 +348,7 @@ export class TransfersService {
       this.logger.error(`Monto o moneda no coinciden`);
       return 'ERROR';
     }
-
-    const newStatus: OrderStatus = (() => {
-      switch (payment.status) {
-        case 'approved': return OrderStatus.APPROVED;
-        case 'pending': return OrderStatus.PENDING;
-        case 'rejected': return OrderStatus.REJECTED;
-        default:
-          this.logger.warn(`Estado de pago no manejado: ${payment.status}`);
-          return OrderStatus.PENDING;
-      }
-    })();
-
+    const newStatus: OrderStatus = OrderStatus.PAID;
     // Transacción completa
     return await this.prisma.$transaction(async (tx) => {
       // 1. Actualizar estado de orden
