@@ -47,6 +47,17 @@ async function createUser(userData: UserSeedData) {
 async function seedUsers() {
   const users: UserSeedData[] = [
     {
+      email: 'padillabrian@gmail.com',
+      password: 'Norma3072',
+      dni: '42469579',
+      name: 'brian',
+      givenName: 'brian',
+      familyName: 'padilla',
+      picture: 'https://example.com/brisa.jpg',
+      locale: 'es-AR',
+      role: UserRole.DEVELOPER,
+    },
+    {
       email: 'brisgabella@gmail.com',
       password: 'consagradosBri2025',
       dni: '00000001',

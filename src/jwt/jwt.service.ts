@@ -3,6 +3,25 @@
 import { Injectable } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 
+export interface Attendee {
+  name: string;
+  cuil: string;
+}
+
+export interface MetadataPayload {
+  orderId: string;
+  userId: string | null;
+  eventId: string;
+  comboId: string;
+  quantity: number;
+  email: string;
+  cuil: string;
+  totalAmount: number;
+  currency: string;
+  attendees: Attendee[];
+  iat: number;
+}
+
 @Injectable()
 export class JwtService {
   private readonly secret = process.env.MP_WEBHOOK_SECRET || '';
@@ -20,7 +39,8 @@ export class JwtService {
   }
 }
    // Decodificar token sin verificar (solo obtener los datos)
-  decodeMetadata(token: string): Record<string, unknown> {
-    return jwt.decode(token) as Record<string, unknown>;
+  decodeMetadata(token: string): MetadataPayload | null {
+    const decoded = jwt.decode(token);
+    return decoded as MetadataPayload | null;
   }
 }

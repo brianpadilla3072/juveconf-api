@@ -1,13 +1,15 @@
 /* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable prettier/prettier */
-/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable prettier/prettier */
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { 
+  BadRequestException, 
+  Injectable,
+  InternalServerErrorException, 
+  Logger, 
+  NotFoundException 
+} from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { Order, PaymentType, OrderStatus } from '@prisma/client';
 import { JwtService } from 'src/jwt/jwt.service';
@@ -16,7 +18,10 @@ import { JwtService } from 'src/jwt/jwt.service';
 export class OrdersService {
     private readonly logger = new Logger(OrdersService.name);
 
-  constructor(private prisma: PrismaService,private jwtService: JwtService) { }
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService
+  ) {}
   async createOrder(data: {
     id: string
     userId?: string | null;
@@ -26,8 +31,10 @@ export class OrdersService {
     quantity: number;
     unitPrice: number;
     metadataToken: string;
+    email: string;
+    cuil: string;
   }) {
-    const { userId, comboId, paymentType, quantity, unitPrice, metadataToken, id } = data;
+    const { userId, comboId, paymentType, quantity, unitPrice, metadataToken, id,email,cuil } = data;
     const year = new Date().getFullYear();
 
     // Buscar el combo
@@ -51,6 +58,8 @@ export class OrdersService {
         status: OrderStatus.PENDING,
         paymentType,
         metadataToken,
+        email,
+        cuil,
         combos: {
           connect: [{ id: comboId }],
         },
@@ -139,6 +148,116 @@ export class OrdersService {
       },
       orderBy: {
         createdAt: 'desc'
+      }
+    });
+  }
+
+  async moveToReview(orderId: string, email: string, cuil: string): Promise<{success: boolean,data: Order}> {
+    // Validar parámetros de entrada
+    if (!orderId || !email || !cuil) {
+      throw new BadRequestException('ID de orden, email y CUIL son requeridos');
+    }
+
+    // Primero obtenemos la orden
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId }
+    });
+    
+    try {
+    if (!order) {
+      throw new NotFoundException(`No se encontró la orden con ID: ${orderId}`);
+    }
+      // Si pasa las validaciones, actualizar el estado
+      const updatedOrder = await this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.REVIEW },
+      });
+
+      return {success: true,data: updatedOrder};
+    } catch (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+  }
+
+  async approveOrder(orderId: string): Promise<{success: boolean, data: Order}> {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Actualizar el estado de la orden
+      const order = await tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.PAID },
+        include: { user: true }
+      });
+
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      // 2. Decodificar el token de metadatos
+      const metadataPayload = this.jwtService.decodeMetadata(order.metadataToken || '');
+      if (!metadataPayload) {
+        throw new BadRequestException('Invalid metadata token');
+      }
+
+      // 3. Crear el pago
+      const payment = await tx.payment.create({
+        data: {
+          year: order.year,
+          orderId: order.id,
+          amount: order.total,
+          type: 'TRANSFER',
+          externalReference: metadataPayload.orderId,
+          userId: order.userId || undefined,
+          payerEmail: order.user?.email || undefined,
+          payerName: order.user?.name || '',
+          payerDni: metadataPayload.cuil || undefined,
+        }
+      });
+
+      // 4. Crear invitados si existen
+      if (metadataPayload.attendees?.length) {
+        await Promise.all(
+          metadataPayload.attendees.map(attendee => 
+            tx.invitee.create({
+              data: {
+                name: attendee.name,
+                cuil: attendee.cuil,
+                orderId: order.id,
+                paymentId: payment.id,
+              }
+            })
+          )
+        );
+      }
+
+      return { success: true, data: order };
+    }, {
+      maxWait: 5000,
+      timeout: 10000,
+      isolationLevel: 'Serializable'
+    });
+  }
+
+  async deleteOrder(orderId: string): Promise<Order> {
+    // First, check if the order has any payments
+    const orderWithPayments = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payments: true }
+    });
+
+    if (!orderWithPayments) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // If the order has payments, throw an error
+    if (orderWithPayments.payments && orderWithPayments.payments.length > 0) {
+      throw new BadRequestException('Cannot delete an order with associated payments');
+    }
+
+    // Perform logical deletion by setting deletedAt
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { 
+        deletedAt: new Date() 
       }
     });
   }

@@ -49,7 +49,7 @@ export class MercadopagoService {
     this.mpConfig = new MercadoPagoConfig({ accessToken: token });
     this.paymentClient = new Payment(this.mpConfig);
   }
-
+  // Crea el link de pago y la orden en pending
   async createPreference(dto: CreatePreferenceDto): Promise<string> {
     // 1) Obtener combo y payload para validaciones
     const combo = await this.combosService.findOne(dto.id);
@@ -91,6 +91,8 @@ export class MercadopagoService {
           total: totalAmount,
           status: OrderStatus.PENDING,
           paymentType: PaymentType.MERCADOPAGO,
+          email: dto.email,
+          cuil: dto.cuil,
           combos: { connect: [{ id: combo.id }] },
         },
       });
@@ -109,13 +111,14 @@ export class MercadopagoService {
         attendees: dto.attendees,
       };
       const metadataToken = this.jwtService.signMetadata(metadataPayload);
-
+      const priceWithIn = (combo.price * 0.26) + combo.price ;
       // 3.3) Crear preferencia en MercadoPago
       const preferenceRequest = {
-        items: [{ id: combo.id, title: combo.name, unit_price: combo.price, quantity: combo.minPersons }],
+        items: [{ id: combo.id, title: combo.name, unit_price: priceWithIn, quantity: combo.minPersons }],
         metadata: { token: metadataToken },
         external_reference: String(order.id),
       };
+      console.log(preferenceRequest);
       const preference = await new Preference(this.mpConfig).create({ body: preferenceRequest });
       if (!preference?.id || !preference.init_point) {
         throw new CustomError(500, 'Error en la creación de preferencia', 'No se pudo crear la preferencia de pago.');
@@ -133,6 +136,7 @@ export class MercadopagoService {
       throw new CustomError(500, 'Error inesperado', 'Hubo un error inesperado. Por favor, intenta de nuevo.');
     });
   }
+  // WEBHOOK : Procesa la notificación de pago
   async processNotification(rawBody: string): Promise<'OK' | 'ERROR'> {
     this.logger.log('Iniciando procesamiento de notificación de pago...');
 
@@ -287,56 +291,56 @@ export class MercadopagoService {
     this.logger.log('Notificación procesada correctamente.');
     return 'OK';
   }
-  async getPaymentsByDateRange(
-    begin: string,
-    end: string,
-  ): Promise<any> {
-    const url = `${this.BASE_URL}` +
-      `?range=date_created` +
-      `&begin_date=${encodeURIComponent(begin)}` +
-      `&end_date=${encodeURIComponent(end)}`;
+  // async getPaymentsByDateRange(
+  //   begin: string,
+  //   end: string,
+  // ): Promise<any> {
+  //   const url = `${this.BASE_URL}` +
+  //     `?range=date_created` +
+  //     `&begin_date=${encodeURIComponent(begin)}` +
+  //     `&end_date=${encodeURIComponent(end)}`;
 
-    const headers = {
-      Authorization: `Bearer ${this.mpConfig.accessToken}`,
-      'Content-Type': 'application/json',
-    };
+  //   const headers = {
+  //     Authorization: `Bearer ${this.mpConfig.accessToken}`,
+  //     'Content-Type': 'application/json',
+  //   };
 
-    const response = await firstValueFrom(
-      this.http.get(url, { headers }),
-    );
-    return response.data;
-  }
-  async getCollectorId(): Promise<number> {
-    const url = 'https://api.mercadopago.com/users/me';
-    const headers = {
-      Authorization: `Bearer ${this.mpConfig.accessToken}`,
-      'Content-Type': 'application/json',
-    };
+  //   const response = await firstValueFrom(
+  //     this.http.get(url, { headers }),
+  //   );
+  //   return response.data;
+  // }
+  // async getCollectorId(): Promise<number> {
+  //   const url = 'https://api.mercadopago.com/users/me';
+  //   const headers = {
+  //     Authorization: `Bearer ${this.mpConfig.accessToken}`,
+  //     'Content-Type': 'application/json',
+  //   };
 
-    try {
-      const response$ = this.http.get(url, { headers });
-      const response = await firstValueFrom(response$);
+  //   try {
+  //     const response$ = this.http.get(url, { headers });
+  //     const response = await firstValueFrom(response$);
 
-      const collectorId = response.data.id;
-      return collectorId;
-    } catch (error) {
-      throw new CustomError(500, 'Error al obtener collector ID', 'Hubo un problema al consultar la cuenta de MercadoPago.');
-    }
-  }
-  async getPaymentById(paymentId: number): Promise<any> {
-    const url = `https://api.mercadopago.com/v1/payments/${paymentId}`;
-    const headers = {
-      Authorization: `Bearer ${this.mpConfig.accessToken}`,
-      'Content-Type': 'application/json',
-    };
+  //     const collectorId = response.data.id;
+  //     return collectorId;
+  //   } catch (error) {
+  //     throw new CustomError(500, 'Error al obtener collector ID', 'Hubo un problema al consultar la cuenta de MercadoPago.');
+  //   }
+  // }
+  // async getPaymentById(paymentId: number): Promise<any> {
+  //   const url = `https://api.mercadopago.com/v1/payments/${paymentId}`;
+  //   const headers = {
+  //     Authorization: `Bearer ${this.mpConfig.accessToken}`,
+  //     'Content-Type': 'application/json',
+  //   };
 
-    try {
-      const response$ = this.http.get(url, { headers });
-      const response = await firstValueFrom(response$);
-      return response.data;
-    } catch (error: any) {
-      throw new Error(`Error al obtener el pago con ID ${paymentId}: ${error.message}`);
-    }
-  }
+  //   try {
+  //     const response$ = this.http.get(url, { headers });
+  //     const response = await firstValueFrom(response$);
+  //     return response.data;
+  //   } catch (error: any) {
+  //     throw new Error(`Error al obtener el pago con ID ${paymentId}: ${error.message}`);
+  //   }
+  // }
 
 }

@@ -117,12 +117,9 @@ model Order {
   year              Int
   userId            String?
   user              User?        @relation(fields: [userId], references: [id])
-
   eventId           String
   event             Event        @relation(fields: [eventId], references: [id])
-
   combos            Combo[]      // Relación many-to-many implícita
-
   total             Float
   status            OrderStatus       @default(PENDING)
   paymentType       PaymentType
@@ -132,7 +129,8 @@ model Order {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   deletedAt         DateTime?
-
+  email             String
+  cuil              String
   payments          Payment[]
   invitees          Invitee[]
 }

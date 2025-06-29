@@ -7,12 +7,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable prettier/prettier */
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { PasswordService } from '../global/password.service';  
-
+import { User } from '@prisma/client';
 @Injectable()
-export class UsersService {
+export default class UsersService {
     constructor(private prisma: PrismaService, private passwordService: PasswordService) {}
     async createUser(data: { name: string; email: string; password: string ; dni:string }) {
       // Cifra la contraseña antes de guardarla
@@ -29,10 +29,9 @@ export class UsersService {
       async findAllUsers() {
         return this.prisma.user.findMany();
       }
-      async getUser(id: string) {
+      async getUser(id: string): Promise<User | null>{
         const user = await this.prisma.user.findUnique({ where: { id }});
-        if (!user) throw new NotFoundException(`Usuario ${id} no existe`);
-        return user;
+        return user || null;
       }
       
       
