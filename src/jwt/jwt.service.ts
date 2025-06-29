@@ -9,6 +9,7 @@ export interface Attendee {
 }
 
 export interface MetadataPayload {
+  name: undefined;
   orderId: string;
   userId: string | null;
   eventId: string;

@@ -18,11 +18,11 @@ import { MailService } from 'src/mail/mail.service';
 @Injectable()
 export class OrdersService {
     private readonly logger = new Logger(OrdersService.name);
-    private readonly mailService: MailService
 
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private mailService: MailService
   ) {}
   async createOrder(data: {
     id: string
@@ -182,12 +182,12 @@ export class OrdersService {
   }
 
   async approveOrder(orderId: string): Promise<{success: boolean, data: Order}> {
+    
     return this.prisma.$transaction(async (tx) => {
       // 1. Actualizar el estado de la orden
       const order = await tx.order.update({
         where: { id: orderId },
-        data: { status: OrderStatus.PAID },
-        include: { user: true }
+        data: { status: OrderStatus.PAID }
       });
 
       if (!order) {
@@ -209,8 +209,8 @@ export class OrdersService {
           type: 'TRANSFER',
           externalReference: metadataPayload.orderId,
           userId: order.userId || undefined,
-          payerEmail: order.user?.email || undefined,
-          payerName: order.user?.name || '',
+          payerEmail: order.email || undefined,
+          payerName: metadataPayload.name || undefined,
           payerDni: metadataPayload.cuil || undefined,
         }
       });
@@ -312,6 +312,9 @@ export class OrdersService {
       }
     });
   }
+
+
 }
+
 export { OrderStatus };
 

@@ -7,9 +7,11 @@ import {
   HttpCode, 
   HttpStatus, 
   NotFoundException, 
-  Logger} from '@nestjs/common';
+  Logger,
+  Get, 
+  UseGuards
+} from '@nestjs/common';
 import { OrdersService, OrderStatus } from './orders.service';
-import { Get, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
@@ -44,12 +46,7 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
   async approveOrder(@Param('id') id: string) {
-    try {
-      return await this.ordersService.approveOrder(id);
-    } catch (error: unknown) {
-      this.logger.error(`Failed to approve order ${id}`, error instanceof Error ? error.stack : String(error));
-      throw new NotFoundException('Order not found');
-    }
+    return await this.ordersService.approveOrder(id);
   }
 
   @Delete(':id')
@@ -65,4 +62,6 @@ export class OrdersController {
       throw new NotFoundException('Order not found');
     }
   }
+
+
 }

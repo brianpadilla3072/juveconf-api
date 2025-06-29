@@ -8,10 +8,10 @@ import { PaymentsService } from 'src/payments/payments.service';
 import { InviteesService } from 'src/invitees/invitees.service';
 import { UsersModule } from 'src/users/users.module';
 import { PasswordService } from 'src/global/password.service';
-import { MailService } from 'src/mail/mail.service';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
-  imports: [UsersModule],
+  imports: [UsersModule, MailModule],
   controllers: [OrdersController],
   providers: [
     OrdersService,
@@ -20,7 +20,7 @@ import { MailService } from 'src/mail/mail.service';
     PaymentsService,
     InviteesService,
     PasswordService,
-    MailService,
+
   ],
   exports: [OrdersService]
 })
