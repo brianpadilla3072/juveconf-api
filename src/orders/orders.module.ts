@@ -8,6 +8,7 @@ import { PaymentsService } from 'src/payments/payments.service';
 import { InviteesService } from 'src/invitees/invitees.service';
 import { UsersModule } from 'src/users/users.module';
 import { PasswordService } from 'src/global/password.service';
+import { MailService } from 'src/mail/mail.service';
 
 @Module({
   imports: [UsersModule],
@@ -18,7 +19,8 @@ import { PasswordService } from 'src/global/password.service';
     JwtService,
     PaymentsService,
     InviteesService,
-    PasswordService
+    PasswordService,
+    MailService,
   ],
   exports: [OrdersService]
 })
