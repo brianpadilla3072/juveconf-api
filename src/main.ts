@@ -22,7 +22,15 @@ async function bootstrap() {
 
   }));
 
-  app.enableCors({ origin: '*' });
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: '*',
+    exposedHeaders: '*',
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+  });
   const config = new DocumentBuilder()
     .setTitle('Consagrados a Jesus')
     .setDescription('API consagrados a jesus')

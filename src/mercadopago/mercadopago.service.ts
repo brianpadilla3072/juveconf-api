@@ -19,6 +19,7 @@ import { PaymentType } from '@prisma/client';
 import { AttendeeDto, CreatePreferenceDto } from './DTOs/create-preference.dto';
 import { CustomError } from 'src/global/CustomError';
 import { firstValueFrom } from 'rxjs';
+import { MailService } from 'src/mail/mail.service';
 
 interface MetadataPayload {
   userId: string | null;
@@ -44,12 +45,13 @@ export class MercadopagoService {
     private readonly prisma: PrismaService,
     private readonly combosService: CombosService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {
     const token = process.env.MP_ACCESS_TOKEN!;
     this.mpConfig = new MercadoPagoConfig({ accessToken: token });
     this.paymentClient = new Payment(this.mpConfig);
   }
-
+  // Crea el link de pago y la orden en pending
   async createPreference(dto: CreatePreferenceDto): Promise<string> {
     // 1) Obtener combo y payload para validaciones
     const combo = await this.combosService.findOne(dto.id);
@@ -91,6 +93,8 @@ export class MercadopagoService {
           total: totalAmount,
           status: OrderStatus.PENDING,
           paymentType: PaymentType.MERCADOPAGO,
+          email: dto.email,
+          cuil: dto.cuil,
           combos: { connect: [{ id: combo.id }] },
         },
       });
@@ -109,13 +113,14 @@ export class MercadopagoService {
         attendees: dto.attendees,
       };
       const metadataToken = this.jwtService.signMetadata(metadataPayload);
-
+      const priceWithIn = (combo.price * 0.26) + combo.price ;
       // 3.3) Crear preferencia en MercadoPago
       const preferenceRequest = {
-        items: [{ id: combo.id, title: combo.name, unit_price: combo.price, quantity: combo.minPersons }],
+        items: [{ id: combo.id, title: combo.name, unit_price: priceWithIn, quantity: combo.minPersons }],
         metadata: { token: metadataToken },
         external_reference: String(order.id),
       };
+      console.log(preferenceRequest);
       const preference = await new Preference(this.mpConfig).create({ body: preferenceRequest });
       if (!preference?.id || !preference.init_point) {
         throw new CustomError(500, 'Error en la creación de preferencia', 'No se pudo crear la preferencia de pago.');
@@ -133,6 +138,7 @@ export class MercadopagoService {
       throw new CustomError(500, 'Error inesperado', 'Hubo un error inesperado. Por favor, intenta de nuevo.');
     });
   }
+  // WEBHOOK : Procesa la notificación de pago
   async processNotification(rawBody: string): Promise<'OK' | 'ERROR'> {
     this.logger.log('Iniciando procesamiento de notificación de pago...');
 
@@ -208,13 +214,10 @@ export class MercadopagoService {
     let newStatus: OrderStatus;
     switch (mpPayment.status) {
       case 'approved':
-        newStatus = OrderStatus.APPROVED;
+        newStatus = OrderStatus.PAID;
         break;
       case 'pending':
         newStatus = OrderStatus.PENDING;
-        break;
-      case 'rejected':
-        newStatus = OrderStatus.REJECTED;
         break;
       default:
         this.logger.warn(`Estado de pago no manejado: ${mpPayment.status}`);
@@ -285,61 +288,111 @@ export class MercadopagoService {
       }
 
       this.logger.log(`Se crearon ${attendees.length} asistentes para la orden ID=${order.id}`);
+      const template = `<!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Descargar Entrada</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; padding: 20px 0;">
+            <tr>
+              <td align="center">
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; padding: 30px; box-shadow: 0 0 5px rgba(0,0,0,0.1);">
+                  <tr>
+                    <td align="center" style="padding-bottom: 20px;">
+                      <h1 style="color: #2c3e50; margin: 0;">¡Gracias por tu compra!</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td align="center" style="padding: 10px 0;">
+                      <p style="font-size: 16px; color: #333333; margin: 0;">El ID de tu Compra es:</p>
+                      <p style="font-size: 16px; font-weight: bold; color: #f76f1f; word-break: break-word; margin: 5px 0 20px;">${payment.id}</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td align="center">
+                      <p style="font-size: 16px; color: #333333; margin: 0 0 20px;">Hacé clic en el botón para ir a la página donde podés descargar tu entrada:</p>
+                      <a href="https://consagradosajesus.com/descargar-entrada/${payment.id}"
+                        style="background-color: #f76f1f; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 5px; display: inline-block; font-size: 16px; margin-top: 10px;">
+                        Ir a la página de descarga
+                      </a>
+                      <p style="font-size: 14px; color: #555555; margin-top: 20px;">
+                        O hacé clic en este enlace si el botón no funciona:<br />
+                        <a href="https://consagradosajesus.com/descargar-entrada/${payment.id}"
+                          style="color: #2980b9; text-decoration: underline;">https://consagradosajesus.com/descargar-entrada/${payment.id}</a>
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td align="center" style="padding-top: 30px;">
+                      <p style="font-size: 12px; color: #999999;">Este mensaje fue generado automáticamente. Por favor no respondas este correo.</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+      
+            `
+          await this.mailService.sendCustomEmail(order.email,template,`YA PODES DESCARGAR TUS ENTRADAS: ${payment.id} `)
     }
 
     this.logger.log('Notificación procesada correctamente.');
     return 'OK';
   }
-  async getPaymentsByDateRange(
-    begin: string,
-    end: string,
-  ): Promise<any> {
-    const url = `${this.BASE_URL}` +
-      `?range=date_created` +
-      `&begin_date=${encodeURIComponent(begin)}` +
-      `&end_date=${encodeURIComponent(end)}`;
+  // async getPaymentsByDateRange(
+  //   begin: string,
+  //   end: string,
+  // ): Promise<any> {
+  //   const url = `${this.BASE_URL}` +
+  //     `?range=date_created` +
+  //     `&begin_date=${encodeURIComponent(begin)}` +
+  //     `&end_date=${encodeURIComponent(end)}`;
 
-    const headers = {
-      Authorization: `Bearer ${this.mpConfig.accessToken}`,
-      'Content-Type': 'application/json',
-    };
+  //   const headers = {
+  //     Authorization: `Bearer ${this.mpConfig.accessToken}`,
+  //     'Content-Type': 'application/json',
+  //   };
 
-    const response = await firstValueFrom(
-      this.http.get(url, { headers }),
-    );
-    return response.data;
-  }
-  async getCollectorId(): Promise<number> {
-    const url = 'https://api.mercadopago.com/users/me';
-    const headers = {
-      Authorization: `Bearer ${this.mpConfig.accessToken}`,
-      'Content-Type': 'application/json',
-    };
+  //   const response = await firstValueFrom(
+  //     this.http.get(url, { headers }),
+  //   );
+  //   return response.data;
+  // }
+  // async getCollectorId(): Promise<number> {
+  //   const url = 'https://api.mercadopago.com/users/me';
+  //   const headers = {
+  //     Authorization: `Bearer ${this.mpConfig.accessToken}`,
+  //     'Content-Type': 'application/json',
+  //   };
 
-    try {
-      const response$ = this.http.get(url, { headers });
-      const response = await firstValueFrom(response$);
+  //   try {
+  //     const response$ = this.http.get(url, { headers });
+  //     const response = await firstValueFrom(response$);
 
-      const collectorId = response.data.id;
-      return collectorId;
-    } catch (error) {
-      throw new CustomError(500, 'Error al obtener collector ID', 'Hubo un problema al consultar la cuenta de MercadoPago.');
-    }
-  }
-  async getPaymentById(paymentId: number): Promise<any> {
-    const url = `https://api.mercadopago.com/v1/payments/${paymentId}`;
-    const headers = {
-      Authorization: `Bearer ${this.mpConfig.accessToken}`,
-      'Content-Type': 'application/json',
-    };
+  //     const collectorId = response.data.id;
+  //     return collectorId;
+  //   } catch (error) {
+  //     throw new CustomError(500, 'Error al obtener collector ID', 'Hubo un problema al consultar la cuenta de MercadoPago.');
+  //   }
+  // }
+  // async getPaymentById(paymentId: number): Promise<any> {
+  //   const url = `https://api.mercadopago.com/v1/payments/${paymentId}`;
+  //   const headers = {
+  //     Authorization: `Bearer ${this.mpConfig.accessToken}`,
+  //     'Content-Type': 'application/json',
+  //   };
 
-    try {
-      const response$ = this.http.get(url, { headers });
-      const response = await firstValueFrom(response$);
-      return response.data;
-    } catch (error: any) {
-      throw new Error(`Error al obtener el pago con ID ${paymentId}: ${error.message}`);
-    }
-  }
+  //   try {
+  //     const response$ = this.http.get(url, { headers });
+  //     const response = await firstValueFrom(response$);
+  //     return response.data;
+  //   } catch (error: any) {
+  //     throw new Error(`Error al obtener el pago con ID ${paymentId}: ${error.message}`);
+  //   }
+  // }
 
 }

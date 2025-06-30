@@ -1,5 +1,10 @@
-/* eslint-disable prettier/prettier */
-import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -9,29 +14,39 @@ import { PaymentsModule } from './payments/payments.module';
 import { PrismaService } from 'prisma/prisma.service';
 import { MercadopagoModule } from './mercadopago/mercadopago.module';
 import { MailModule } from './mail/mail.module';
-import { RawBodyMiddleware } from './middlewares/raw-body'; // Asegúrate de que la ruta sea correcta
+import { RawBodyMiddleware } from './middlewares/raw-body';
 import { json } from 'express';
 import { EventModule } from './events/event.module';
 import { TransfersModule } from './transfers/transfers.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
-  imports: [UsersModule, CombosModule, OrdersModule, PaymentsModule, MercadopagoModule,MailModule,EventModule,TransfersModule],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
+    UsersModule,
+    CombosModule,
+    OrdersModule,
+    PaymentsModule,
+    MercadopagoModule,
+    MailModule,
+    EventModule,
+    TransfersModule,
+    AuthModule,
+  ],
   controllers: [AppController],
-  providers: [AppService
-    , PrismaService
-  ]
+  providers: [AppService, PrismaService],
 })
 export class AppModule implements NestModule {
-    configure(consumer: MiddlewareConsumer) {
+  configure(consumer: MiddlewareConsumer) {
     // Aplica el RawBodyMiddleware solo a la ruta específica
-    consumer
-      .apply(RawBodyMiddleware)
-      .forRoutes({ path: 'mercadopago/webhook/payment', method: RequestMethod.POST });
+    consumer.apply(RawBodyMiddleware).forRoutes({
+      path: 'mercadopago/webhook/payment',
+      method: RequestMethod.POST,
+    });
 
-    // Aplica el middleware de JSON a todas las rutas
-    consumer
-      .apply(json({ limit: '1mb' }))
-      .forRoutes('*');  // Aplica a todas las rutas
+    consumer.apply(json({ limit: '1mb' })).forRoutes('*');
   }
-
 }

@@ -1,4 +1,6 @@
 /* eslint-disable prettier/prettier */
+/* eslint-disable no-useless-catch */
+/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -44,7 +46,26 @@ export class MailService {
       throw error;
     }
   }
+  async sendCustomEmail(
+    to: string,
+    html: string,
+    subject?: string,
+    attachments?: any[],
+  ) {
+    try {
+      const result = await this.mailer.sendMail({
+        from: this.defaultFrom,
+        to,
+        subject: subject,
+        html,
+        attachments,
+      });
 
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  }
   /**
    * Obtiene la plantilla según el nombre
    */

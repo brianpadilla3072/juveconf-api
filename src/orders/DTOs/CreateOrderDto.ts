@@ -20,4 +20,8 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   preferenceId?:string
+  @IsString()
+  email:string
+  @IsString()
+  cuil:string
 }

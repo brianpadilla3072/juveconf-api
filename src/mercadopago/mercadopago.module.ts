@@ -9,10 +9,12 @@ import { CombosService } from 'src/combos/combos.service';
 import { PrismaModule } from 'prisma/prisma.module';
 import { JwtModule } from "src/jwt/jwt.module";
 import { OrdersService } from 'src/orders/orders.service';
+import { MailModule } from 'src/mail/mail.module';
+import { MailService } from 'src/mail/mail.service';
 
 @Module({
-  imports: [HttpModule,PrismaModule,JwtModule],
-  providers: [MpSignatureService, MercadopagoService, CombosService,OrdersService],
+  imports: [HttpModule, PrismaModule, JwtModule, MailModule],
+  providers: [MpSignatureService, MercadopagoService, CombosService,OrdersService,MailService],
   controllers: [MercadopagoController],
 })
 export class MercadopagoModule{}

@@ -35,4 +35,9 @@ export class PaymentsController {
   remove(@Param('id') id: string) {
     return this.paymentsService.remove(id);
   }
+
+  @Get(':paymentId/invitees')
+  getPaymentWithInvitees(@Param('paymentId') paymentId: string) {
+    return this.paymentsService.getPaymentWithInvitees(paymentId);
+  }
 }
