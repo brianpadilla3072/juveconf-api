@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 // Configuración de TypeScript para el seed
 import { UserRole, PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -103,10 +104,14 @@ async function seedUsers() {
 
 async function seedCombos(eventId: string) {
   const PRICE_PLANS = [
-    { id: 'individual', name: 'Individual', minPersons: 1, price: 50 },
-    { id: 'small-group', name: 'Grupo Pequeño', minPersons: 5, price: 40 },
-    { id: 'medium-group', name: 'Grupo Mediano', minPersons: 6, price: 35 },
-    { id: 'large-group', name: 'Grupo Grande', minPersons: 10, price: 30 },
+    { id: 'individual', name: 'Individual', minPersons: 1, price: 18000 },
+    { id: '3-entradas', name: '3 entradas', minPersons: 3, price: 50000 },
+    { id: '4-entradas', name: '4 entradas', minPersons: 4, price: 65000 },
+    { id: '5-entradas', name: '5 entradas', minPersons: 5, price: 82000 },
+    { id: '6-entradas',
+      name: '6 entradas + 1 Gratis',
+      minPersons: 7,
+      price: 108000 }
   ];
   const year = new Date().getFullYear();
 
