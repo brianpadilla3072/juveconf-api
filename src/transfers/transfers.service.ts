@@ -99,7 +99,7 @@ export class TransfersService {
     let createdOrder: Order | null = null;    // 3) Crear orden dentro de transacción
     try {
       await this.prisma.$transaction(async (tx) => {
-        const totalAmount = combo.price * combo.minPersons;
+        const totalAmount = combo.price ;
         console.log('[createTransferOrder] Total calculado:', totalAmount);
 
         const order = await tx.order.create({

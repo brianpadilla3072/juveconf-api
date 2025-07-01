@@ -84,7 +84,7 @@ export class MercadopagoService {
     // 3) Transacción: crear orden, token con orderId, preferencia y actualizar orden
     return await this.prisma.$transaction(async (tx) => {
       // 3.1) Crear orden pendiente (sin token ni referencia externa)
-      const totalAmount = combo.price * combo.minPersons;
+      const totalAmount = combo.price ;
       const order = await tx.order.create({
         data: {
           year: new Date().getFullYear(),
@@ -116,7 +116,7 @@ export class MercadopagoService {
       const priceWithIn = (combo.price * 0.26) + combo.price ;
       // 3.3) Crear preferencia en MercadoPago
       const preferenceRequest = {
-        items: [{ id: combo.id, title: combo.name, unit_price: priceWithIn, quantity: combo.minPersons }],
+        items: [{ id: combo.id, title: combo.name, unit_price: priceWithIn, quantity: 1 }],
         metadata: { token: metadataToken },
         external_reference: String(order.id),
       };
