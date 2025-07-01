@@ -105,11 +105,11 @@ async function seedUsers() {
 async function seedCombos(eventId: string) {
   const PRICE_PLANS = [
     { id: 'individual', name: 'Individual', minPersons: 1, price: 18000 },
-    { id: '3-entradas', name: '3 entradas', minPersons: 3, price: 50000 },
-    { id: '4-entradas', name: '4 entradas', minPersons: 4, price: 65000 },
-    { id: '5-entradas', name: '5 entradas', minPersons: 5, price: 82000 },
+    { id: '3-entradas', name: '3 Entradas', minPersons: 3, price: 50000 },
+    { id: '4-entradas', name: '4 Entradas', minPersons: 4, price: 65000 },
+    { id: '5-entradas', name: '5 Entradas', minPersons: 5, price: 82000 },
     { id: '6-entradas',
-      name: '6 entradas + 1 Gratis',
+      name: '6 Entradas + 1 Gratis',
       minPersons: 7,
       price: 108000 }
   ];
