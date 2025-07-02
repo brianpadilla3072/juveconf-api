@@ -188,11 +188,11 @@ export class MercadopagoService {
 
     // 4) Validar monto y moneda
     if (
-      mpPayment.transaction_amount !== payload.totalAmount ||
+      mpPayment.transaction_amount !== (payload.totalAmount * 0.26) + payload.totalAmount ||
       mpPayment.currency_id !== payload.currency
     ) {
       this.logger.error(
-        `Monto o moneda no coinciden. MP=${mpPayment.transaction_amount}/${mpPayment.currency_id}, Payload=${payload.totalAmount}/${payload.currency}`,
+        `Monto o moneda no coinciden. MP=${mpPayment.transaction_amount}/${mpPayment.currency_id}, Payload=${(payload.totalAmount * 0.26) + payload.totalAmount}/${payload.currency}`,
       );
       return 'ERROR';
     }
@@ -238,7 +238,7 @@ export class MercadopagoService {
       data: {
         year: new Date().getFullYear(),
         orderId: order.id,
-        amount: mpPayment.transaction_amount,
+        amount: payload.totalAmount,
         type: PaymentType.MERCADOPAGO,
         externalReference: String(mpPayment.id),
         userId: payload.userId,
