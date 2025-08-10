@@ -48,5 +48,13 @@ export class TransfersController {
     console.log(dto);
     return this.ordersService.moveToReview(dto.orderId,dto.email,dto.cuil);
   }
+
+  @Post('create-cash-order')
+  @HttpCode(HttpStatus.CREATED)
+  async createCashOrder(
+    @Body() dto: CreatePreferenceDto,
+  ) {
+    return this.transfersService.createCashOrder(dto);
+  }
 }
 

@@ -1,86 +1,171 @@
 
-# Seed
+# Consagrados a Jesús API
 
-```bash
-npx ts-node prisma/seed.ts
+## Overview
+
+RESTful API backend for the Consagrados a Jesús event management system, built with NestJS and PostgreSQL. This API handles user authentication, event registration, payment processing through MercadoPago, and comprehensive order management.
+
+## Table of Contents
+
+1. [Technology Stack](#technology-stack)
+2. [Database Schema](#database-schema)
+3. [Authentication & Security](#authentication--security)
+4. [Business Logic & Flows](#business-logic--flows)
+5. [Environment Setup](#environment-setup)
+6. [Development](#development)
+7. [Deployment](#deployment)
+
+## Technology Stack
+
+- **Framework**: NestJS 11.x
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: JWT with Passport
+- **Payment Gateway**: MercadoPago SDK
+- **Email Service**: Nodemailer with Handlebars templates
+- **Validation**: class-validator, class-transformer
+- **Security**: Helmet, bcrypt password hashing
+- **Queue System**: Bull/BullMQ with Redis
+- **API Documentation**: Swagger/OpenAPI
+
+### Core Dependencies
+
+```json
+{
+  "@nestjs/core": "^11.0.1",
+  "@nestjs/jwt": "^11.0.0",
+  "@nestjs/passport": "^11.0.5",
+  "@prisma/client": "^6.7.0",
+  "mercadopago": "^2.5.0",
+  "bcrypt": "^5.1.1",
+  "passport-jwt": "^4.0.1"
+}
 ```
 
-# Referencia
+## Database Schema
 
-- [Panel de Desarrolladores de Mercado Pago](https://www.mercadopago.com.ar/developers/panel/app)
+### Entity Relationships
 
----
+```
+User (1:N) → Order (1:N) → Payment
+Event (1:N) → Order, Combo
+Order (M:N) → Combo
+Payment (1:N) → Invitee
+Order (1:N) → Invitee
+```
 
-# Flujo de Usuario
+### Core Models
 
-- El usuario se registra y se le asigna un rol por defecto `<USER>`.  
-- Puede acceder a los datos de su entrada.  
-- Puede crear una cuenta con su correo y contraseña, o mediante Auth0 con Google.  
-- El `<SUPERUSER>` puede asignar el rol `<ADMIN>`.  
-- El `<ADMIN>` puede asignar cualquier rol, **exceptuando** `<SUPERUSER>` y `<ADMIN>` (no puede replicarse ni crear superusuarios).
+#### User
+```prisma
+model User {
+  id              String       @id @default(uuid())
+  auth0Id         String?      @unique
+  provider        AuthProvider @default(LOCAL)
+  dni             String       @unique
+  name            String
+  email           String       @unique
+  emailVerified   Boolean      @default(false)
+  password        String?      // Optional for Auth0 users
+  role            UserRole     @default(USER)
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  lastLogin       DateTime?
+  deletedAt       DateTime?
+}
+```
 
----
+### User Roles & Authorization
 
-# Flujo de Compra
+- **USER**: Default role, can access own data and create orders
+- **COLLABORATOR**: Can view additional event information
+- **EDITOR**: Can modify some event content
+- **ADMIN**: Can approve orders and manage users (except SUPERADMIN creation)
+- **DEVELOPER**: Full development access
+- **SUPERADMIN**: Complete system access, can assign ADMIN roles
 
-## 1. Solicitud de Combos
+## Business Logic & Flows
 
-- El frontend solicita los combos al backend.
-- El backend verifica:
-  - Si el período corresponde a una preventa.
-  - Si aún hay entradas disponibles.
-- Si todo es válido, se devuelven los datos al frontend.
-- El usuario elige el medio de pago:
-  - **Mercado Pago**, con un recargo del 27%.
-  - **Transferencia bancaria**, sin recargo.
+### User Registration & Authentication
 
----
+1. Users register with default USER role
+2. Can authenticate via local credentials or Auth0 with Google
+3. SUPERADMIN can assign ADMIN roles
+4. ADMIN can assign any role except SUPERADMIN and ADMIN
 
-## 2. Flujo de Mercado Pago
+### Purchase Flow Overview
 
-- Al cargar los datos del pedido, se envían al backend.
-- El backend crea una preferencia de pago con los ítems.
-- Se devuelve una URL de pago y se redirecciona al usuario.
-- Se registra una orden de pago en la base de datos.
+#### 1. Combo Selection Process
 
-### Webhook de Aprobación
+- Frontend requests available combos from backend
+- Backend validates:
+  - Pre-sale period eligibility
+  - Ticket availability for event capacity
+- Valid combos returned with pricing options:
+  - **MercadoPago**: 27% surcharge included
+  - **Bank Transfer**: No additional charges
 
-- Verifica que la notificación proviene de Mercado Pago.
-- Si es válida, agrega los invitados incluidos en la metadata a la base de datos.
+#### 2. MercadoPago Payment Flow
 
+**Order Creation:**
+- User submits order data to backend
+- Backend creates payment preference with item details
+- Payment URL generated and user redirected to MercadoPago
+- Order registered in database with PENDING status
 
-$ curl --url "smtp://smtp.zoho.com:587" --ssl-reqd --mail-from "equipo@consagradosajesus.com" --mail-rcpt "brianpadilla.work@gmail.com" --upload-file correo.txt --user "equipo@consagradosajesus.com:1XQQUrz8QgLV" --insecure
+**Webhook Processing:**
+- MercadoPago sends payment notifications to webhook endpoint
+- Backend verifies notification authenticity
+- On successful payment:
+  - Order status updated to PAID
+  - Payment record created
+  - Invitees extracted from metadata and saved
+  - Confirmation email sent with ticket download link
 
----
+#### 3. Bank Transfer Flow
 
-## 3. Flujo de Transferencia Bancaria
+**Order Initiation:**
+- User selects "Bank Transfer" option
+- Provides email and CUIL (Argentine tax ID)
+- Order created with invitee details
 
-- El usuario selecciona "Transferencia".
-- Completa su email y CUIL.
-- Se crea una orden de pago con los datos de los invitados.
+**Manual Confirmation Process:**
+- Confirmation email sent with verification button
+- User clicks to confirm transfer completion
+- System validates:
+  - Email matches order email
+  - CUIL matches order CUIL  
+  - Transfer amount matches expected total (with rounding tolerance)
 
-### Confirmación Manual del Pago
+**Payment Processing:**
+- **Valid Transfer**: Payment created, invitees added to database
+- **Invalid Transfer**: Saved to pending payments table for manual admin review
 
-- Se envía un email al usuario con un botón para confirmar la transferencia.
-- Al hacer clic, se verifica:
-  - Que el email coincida con la cuenta.
-  - Que el CUIL coincida.
-  - Que el valor transferido (redondeado) sea correcto.
-- Si todo coincide:
-  - Se crea un pago.
-  - Se agregan los invitados a la tabla `invites`.
-- Si no coincide:
-  - Se guarda en una tabla de pagos pendientes para revisión manual.
+### Email Notification System
 
----
+Automated emails triggered for:
+- **User Registration**: Welcome message
+- **Payment Confirmation**: Order details and invitee information
+- **Transfer Confirmation**: Bank transfer verification
+- **Admin Broadcasts**: Mass messaging to USER role accounts
+- **Annual Reminders**: Re-engagement for previous year attendees
 
-## Notificaciones por Email
+## Database Setup & Seeding
 
-- Al crear un usuario (bienvenida).
-- Al generar un pago, con el detalle de entradas e invitados.
-- Confirmación de transferencia.
-- Envío de mensajes masivos por parte del `<ADMIN>` a `<USER>`.
-- Recordatorios para usuarios que asistieron en años anteriores.
+```bash
+# Setup database schema
+npx prisma migrate dev
+
+# Seed initial data
+npx ts-node prisma/seed.ts
+
+# View database in browser
+npx prisma studio --port 9000
+```
+
+## Reference Links
+
+- [MercadoPago Developer Panel](https://www.mercadopago.com.ar/developers/panel/app)
 
 # API Documentation
 

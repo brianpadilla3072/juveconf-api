@@ -29,6 +29,7 @@ enum OrderStatus {
 enum PaymentType {
   TRANSFER
   MERCADOPAGO
+  CASH
 }
 
 enum AuthProvider {

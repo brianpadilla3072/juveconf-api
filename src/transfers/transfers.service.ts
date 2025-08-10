@@ -199,6 +199,190 @@ export class TransfersService {
     console.log('[createTransferOrder] Orden de transferencia creada con éxito.');
     return { success: true, orderID: createdOrder!.id };
   }
+
+  // crea una orden para pagos en efectivo
+  async createCashOrder(dto: CreatePreferenceDto): Promise<{ success: true, orderID: string | null }> {
+    console.log('[createCashOrder] Inicio con DTO:', dto);
+
+    // 1) Obtener combo
+    const combo = await this.prisma.combo.findUnique({ where: { id: dto.id } });
+    if (!combo) {
+      console.warn('[createCashOrder] Combo no encontrado:', dto.id);
+      throw new CustomError(404, 'Combo no encontrado', 'No pudimos encontrar el combo solicitado.');
+    }
+    console.log('[createCashOrder] Combo encontrado:', combo);
+
+    const payloadForCheck = { comboId: dto.id, email: dto.email, cuil: dto.cuil };
+    console.log('[createCashOrder] Payload para validación:', payloadForCheck);
+
+    // 2) Validar órdenes pendientes por efectivo
+    const pendingOrders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.PENDING,
+        paymentType: PaymentType.CASH,
+        eventId: dto.eventId,
+      },
+    });
+    console.log(`[createCashOrder] Órdenes pendientes encontradas: ${pendingOrders.length}`);
+
+    for (const order of pendingOrders) {
+      if (!order.metadataToken) {
+        console.log(`[createCashOrder] Orden ${order.id} sin metadataToken, se omite.`);
+        continue;
+      }
+      let existing: Record<string, any> | null;
+      try {
+        existing = this.jwtService.verifyMetadata(order.metadataToken);
+        console.log(`[createCashOrder] Metadata verificada para orden ${order.id}:`, existing);
+      } catch (err) {
+        console.warn(`[createCashOrder] Error al verificar metadata para orden ${order.id}, se omite.`, err);
+        continue;
+      }
+
+      if (
+        existing?.comboId === payloadForCheck.comboId &&
+        existing?.email === payloadForCheck.email &&
+        existing?.cuil === payloadForCheck.cuil
+      ) {
+        console.warn('[createCashOrder] Orden pendiente existente detectada, se aborta.');
+        throw new CustomError(
+          400,
+          'Orden pendiente existente',
+          'Ya existe una orden pendiente de pago en efectivo para este combo con este email y CUIL.'
+        );
+      }
+    }
+
+    let email: string = "";
+    let createdOrder: Order | null = null;    
+    let verificationLink: string = "";
+
+    // 3) Crear orden dentro de transacción
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const totalAmount = combo.price;
+        console.log('[createCashOrder] Total calculado:', totalAmount);
+
+        const order = await tx.order.create({
+          data: {
+            year: new Date().getFullYear(),
+            userId: dto.userId,
+            eventId: dto.eventId,
+            total: totalAmount,
+            status: OrderStatus.PENDING,
+            email: dto.email,
+            cuil: dto.cuil,
+            paymentType: PaymentType.CASH,
+            combos: { connect: [{ id: combo.id }] },
+          },
+        });
+        console.log('[createCashOrder] Orden creada:', order.id);
+
+        const metadataPayload = {
+          orderId: order.id,
+          userId: dto.userId || null,
+          eventId: dto.eventId,
+          comboId: combo.id,
+          quantity: dto.quantity,
+          email: dto.email,
+          cuil: dto.cuil,
+          totalAmount,
+          currency: 'ARS',
+          attendees: dto.attendees,
+        };
+        email = metadataPayload.email;
+        verificationLink = `https://consagradosajesus.com/verificar-tranferencia/${order.id}`;
+
+        const metadataToken = this.jwtService.signMetadata(metadataPayload);
+        console.log('[createCashOrder] Metadata token generado.');
+
+        await tx.order.update({
+          where: { id: order.id },
+          data: { metadataToken },
+        });
+        createdOrder = order;
+        console.log('[createCashOrder] Orden actualizada con metadata.');
+      });
+    } catch (error) {
+      console.error('[createCashOrder] Error al crear orden:', error);
+      if (error instanceof CustomError) throw error;
+      throw new CustomError(500, 'Error inesperado', 'Hubo un error al crear la orden de pago en efectivo.');
+    }
+
+    // 4) Enviar confirmacion por email
+    const template = `<!DOCTYPE html>
+        <html lang="es">
+          <head>
+            <meta charset="UTF-8" />
+            <title>Confirmar Pago en Efectivo</title>
+          </head>
+          <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; padding: 20px 0;">
+              <tr>
+                <td align="center">
+                  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; padding: 30px; box-shadow: 0 0 5px rgba(0,0,0,0.1);">
+                    <tr>
+                      <td align="center" style="padding-bottom: 20px;">
+                        <h1 style="color: #2c3e50; margin: 0;">¡Tu orden está en progreso!</h1>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center" style="padding: 10px 0;">
+                        <p style="font-size: 16px; color: #333333; margin: 0;">Tu orden de pago en efectivo ha sido creada exitosamente.</p>
+                        <p style="font-size: 16px; color: #333333; margin: 5px 0;">El ID de tu orden es:</p>
+                        <p style="font-size: 16px; font-weight: bold; color: #f76f1f; word-break: break-word; margin: 5px 0 20px;">${createdOrder!.id}</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center" style="padding: 10px 0;">
+                        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 10px 0;">
+                          <p style="font-size: 14px; color: #856404; margin: 0; font-weight: bold;">
+                            💰 Instrucciones de Pago en Efectivo:
+                          </p>
+                          <p style="font-size: 14px; color: #856404; margin: 10px 0 0 0;">
+                            • Acércate al punto de venta autorizado<br/>
+                            • Presenta tu DNI y el ID de orden<br/>
+                            • Realiza el pago por $${combo.price} ARS<br/>
+                            • Guarda el comprobante de pago
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center">
+                        <p style="font-size: 16px; color: #333333; margin: 0 0 20px;">Una vez realizado el pago, podrás confirmar tu compra desde el siguiente enlace:</p>
+                        <a href="${verificationLink}"
+                          style="background-color: #27ae60; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 5px; display: inline-block; font-size: 16px; margin-top: 10px;">
+                          Confirmar Pago en Efectivo
+                        </a>
+                        <p style="font-size: 14px; color: #555555; margin-top: 20px;">
+                          También puedes acceder desde este enlace:<br />
+                          <a href="${verificationLink}"
+                            style="color: #2980b9; text-decoration: underline;">${verificationLink}</a>
+                        </p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center" style="padding-top: 30px;">
+                        <p style="font-size: 12px; color: #999999;">Este mensaje fue generado automáticamente. Por favor no respondas este correo.</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+        </html>
+        `;
+        
+    await this.mailService.sendCustomEmail(email, template, `ORDEN DE PAGO EN EFECTIVO CREADA: ${createdOrder!.id}`);
+    console.log('[createCashOrder] Orden de pago en efectivo creada con éxito.');
+    
+    return { 
+      success: true, 
+      orderID: createdOrder!.id
+    };
+  }
   
   // verifica la transferencia para una cuenta de mp con numero de operacion
   // async verifyTransferDeMercadoPago(paymentId: number, orderId: string) {
