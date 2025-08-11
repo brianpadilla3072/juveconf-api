@@ -140,7 +140,10 @@ export class OrdersService {
   }
   async getOrdersByStatus(status: OrderStatus) {
     return this.prisma.order.findMany({
-      where: { status },
+      where: { 
+        status,
+        deletedAt: null
+      },
       include: {
         user: true,
         event: true,

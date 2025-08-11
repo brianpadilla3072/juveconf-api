@@ -17,6 +17,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '../jwt/jwt.service';
 import { CreatePaymentDto, UpdatePaymentDto } from './DTOs';
+import { DashboardFilterDto } from './DTOs/dashboard-filter.dto';
+import { PaymentType } from '@prisma/client';
 
 @Injectable()
 export class PaymentsService {
@@ -98,6 +100,306 @@ export class PaymentsService {
       const errorStack = error instanceof Error ? error.stack : '';
       this.logger.error(`Error getting payment with invitees: ${errorMessage}`, errorStack);
       throw new InternalServerErrorException('Error retrieving payment data');
+    }
+  }
+
+  // Dashboard endpoints
+  async getDashboardSummary(filters?: DashboardFilterDto) {
+    console.log('[getDashboardSummary] Filtros recibidos:', filters);
+    
+    const whereClause: any = {
+      deletedAt: null,
+    };
+
+    // Aplicar filtros
+    if (filters?.startDate || filters?.endDate) {
+      whereClause.createdAt = {};
+      if (filters.startDate) {
+        whereClause.createdAt.gte = new Date(filters.startDate);
+      }
+      if (filters.endDate) {
+        whereClause.createdAt.lte = new Date(filters.endDate);
+      }
+    }
+
+    if (filters?.paymentType) {
+      whereClause.type = filters.paymentType;
+    }
+
+    if (filters?.year) {
+      whereClause.year = parseInt(filters.year);
+    }
+
+    if (filters?.eventId) {
+      whereClause.order = {
+        eventId: filters.eventId
+      };
+    }
+
+    try {
+      // Total de todos los payments
+      const totalPayments = await this.prisma.payment.aggregate({
+        where: whereClause,
+        _sum: {
+          amount: true,
+        },
+        _count: {
+          id: true,
+        },
+      });
+
+      // Payments por tipo
+      const paymentsByType = await this.prisma.payment.groupBy({
+        by: ['type'],
+        where: whereClause,
+        _sum: {
+          amount: true,
+        },
+        _count: {
+          id: true,
+        },
+      });
+
+      // Payments por mes (últimos 12 meses)
+      const paymentsByMonth = await this.prisma.$queryRaw`
+        SELECT 
+          DATE_TRUNC('month', "createdAt") as month,
+          SUM(amount) as total_amount,
+          COUNT(*) as count
+        FROM "Payment"
+        WHERE "deletedAt" IS NULL
+          AND "createdAt" >= NOW() - INTERVAL '12 months'
+        GROUP BY DATE_TRUNC('month', "createdAt")
+        ORDER BY month DESC
+      `;
+
+      // Top eventos con más ingresos
+      const topEventsByRevenue = await this.prisma.payment.groupBy({
+        by: ['orderId'],
+        where: whereClause,
+        _sum: {
+          amount: true,
+        },
+        _count: {
+          id: true,
+        },
+        orderBy: {
+          _sum: {
+            amount: 'desc',
+          },
+        },
+        take: 5,
+      });
+
+      // Obtener información de eventos para el top
+      const eventIds = topEventsByRevenue.map(p => p.orderId);
+      const eventDetails = await this.prisma.order.findMany({
+        where: {
+          id: { in: eventIds },
+        },
+        include: {
+          event: {
+            select: {
+              id: true,
+              topic: true,
+              year: true,
+            }
+          }
+        }
+      });
+
+      const topEventsWithDetails = topEventsByRevenue.map(payment => {
+        const orderDetail = eventDetails.find(order => order.id === payment.orderId);
+        return {
+          ...payment,
+          event: orderDetail?.event || null,
+          orderId: payment.orderId
+        };
+      });
+
+      console.log('[getDashboardSummary] Resumen calculado exitosamente');
+      
+      return {
+        summary: {
+          totalAmount: totalPayments._sum.amount || 0,
+          totalCount: totalPayments._count.id || 0,
+        },
+        byType: paymentsByType.map(type => ({
+          paymentType: type.type,
+          totalAmount: type._sum.amount || 0,
+          count: type._count.id || 0,
+        })),
+        byMonth: paymentsByMonth,
+        topEvents: topEventsWithDetails,
+      };
+    } catch (error) {
+      console.error('[getDashboardSummary] Error:', error);
+      throw new InternalServerErrorException('Error al obtener resumen del dashboard');
+    }
+  }
+
+  async getPaymentsByType(paymentType?: PaymentType) {
+    const whereClause: any = {
+      deletedAt: null,
+    };
+
+    if (paymentType) {
+      whereClause.type = paymentType;
+    }
+
+    return await this.prisma.payment.findMany({
+      where: whereClause,
+      include: {
+        order: {
+          include: {
+            event: {
+              select: {
+                id: true,
+                topic: true,
+                year: true,
+              }
+            },
+            combos: {
+              select: {
+                id: true,
+                name: true,
+                price: true,
+              }
+            }
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  async getPaymentsByDateRange(startDate: string, endDate: string) {
+    const whereClause = {
+      deletedAt: null,
+      createdAt: {
+        gte: new Date(startDate),
+        lte: new Date(endDate),
+      },
+    };
+
+    return await this.prisma.payment.findMany({
+      where: whereClause,
+      include: {
+        order: {
+          include: {
+            event: {
+              select: {
+                id: true,
+                topic: true,
+                year: true,
+              }
+            }
+          }
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  async getRecentPayments(limit: number = 10) {
+    return await this.prisma.payment.findMany({
+      where: {
+        deletedAt: null,
+      },
+      include: {
+        order: {
+          include: {
+            event: {
+              select: {
+                id: true,
+                topic: true,
+                year: true,
+              }
+            }
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: limit,
+    });
+  }
+
+  async getPaymentStatistics() {
+    try {
+      // Estadísticas generales
+      const totalStats = await this.prisma.payment.aggregate({
+        where: { deletedAt: null },
+        _sum: { amount: true },
+        _count: { id: true },
+        _avg: { amount: true },
+      });
+
+      // Estadísticas por año
+      const statsByYear = await this.prisma.payment.groupBy({
+        by: ['year'],
+        where: { deletedAt: null },
+        _sum: { amount: true },
+        _count: { id: true },
+        _avg: { amount: true },
+        orderBy: { year: 'desc' },
+      });
+
+      // Estadísticas por tipo de pago
+      const statsByType = await this.prisma.payment.groupBy({
+        by: ['type'],
+        where: { deletedAt: null },
+        _sum: { amount: true },
+        _count: { id: true },
+        _avg: { amount: true },
+      });
+
+      // Crecimiento mensual (últimos 6 meses)
+      const monthlyGrowth = await this.prisma.$queryRaw`
+        SELECT 
+          DATE_TRUNC('month', "createdAt") as month,
+          SUM(amount) as total_amount,
+          COUNT(*) as count,
+          AVG(amount) as avg_amount
+        FROM "Payment"
+        WHERE "deletedAt" IS NULL
+          AND "createdAt" >= NOW() - INTERVAL '6 months'
+        GROUP BY DATE_TRUNC('month', "createdAt")
+        ORDER BY month ASC
+      `;
+
+      return {
+        total: {
+          amount: totalStats._sum.amount || 0,
+          count: totalStats._count.id || 0,
+          average: totalStats._avg.amount || 0,
+        },
+        byYear: statsByYear,
+        byType: statsByType,
+        monthlyGrowth,
+      };
+    } catch (error) {
+      console.error('[getPaymentStatistics] Error:', error);
+      throw new InternalServerErrorException('Error al obtener estadísticas de pagos');
     }
   }
 }

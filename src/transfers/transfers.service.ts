@@ -215,17 +215,17 @@ export class TransfersService {
     const payloadForCheck = { comboId: dto.id, email: dto.email, cuil: dto.cuil };
     console.log('[createCashOrder] Payload para validación:', payloadForCheck);
 
-    // 2) Validar órdenes pendientes por efectivo
-    const pendingOrders = await this.prisma.order.findMany({
+    // 2) Validar órdenes en review por efectivo
+    const reviewOrders = await this.prisma.order.findMany({
       where: {
-        status: OrderStatus.PENDING,
+        status: OrderStatus.REVIEW,
         paymentType: PaymentType.CASH,
         eventId: dto.eventId,
       },
     });
-    console.log(`[createCashOrder] Órdenes pendientes encontradas: ${pendingOrders.length}`);
+    console.log(`[createCashOrder] Órdenes en review encontradas: ${reviewOrders.length}`);
 
-    for (const order of pendingOrders) {
+    for (const order of reviewOrders) {
       if (!order.metadataToken) {
         console.log(`[createCashOrder] Orden ${order.id} sin metadataToken, se omite.`);
         continue;
@@ -244,11 +244,11 @@ export class TransfersService {
         existing?.email === payloadForCheck.email &&
         existing?.cuil === payloadForCheck.cuil
       ) {
-        console.warn('[createCashOrder] Orden pendiente existente detectada, se aborta.');
+        console.warn('[createCashOrder] Orden en review existente detectada, se aborta.');
         throw new CustomError(
           400,
-          'Orden pendiente existente',
-          'Ya existe una orden pendiente de pago en efectivo para este combo con este email y CUIL.'
+          'Orden en review existente',
+          'Ya existe una orden en review de pago en efectivo para este combo con este email y CUIL.'
         );
       }
     }
@@ -269,7 +269,7 @@ export class TransfersService {
             userId: dto.userId,
             eventId: dto.eventId,
             total: totalAmount,
-            status: OrderStatus.PENDING,
+            status: OrderStatus.REVIEW,
             email: dto.email,
             cuil: dto.cuil,
             paymentType: PaymentType.CASH,
