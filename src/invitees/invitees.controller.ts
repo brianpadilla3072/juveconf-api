@@ -1,6 +1,4 @@
 /* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable prettier/prettier */
 import { Body, Controller, Get, Param, ParseUUIDPipe, Query, Patch } from '@nestjs/common';
 import { InviteesService } from './invitees.service';
 import { FilterInviteesDto } from './DTOs';

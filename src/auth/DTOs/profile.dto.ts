@@ -8,31 +8,31 @@ export class UserProfileDto {
   familyName?: string;
   dni: string;
   role: string;
-  
+
   @Exclude()
   password?: string;
-  
+
   @Exclude()
   auth0Id?: string;
-  
+
   @Exclude()
   provider?: string;
-  
+
   @Exclude()
   emailVerified?: boolean;
-  
+
   @Exclude()
   picture?: string;
-  
+
   @Exclude()
   locale?: string;
-  
+
   @Exclude()
   lastLogin?: Date;
-  
+
   @Exclude()
   deletedAt?: Date;
-  
+
   constructor(partial: Partial<UserProfileDto>) {
     Object.assign(this, partial);
   }

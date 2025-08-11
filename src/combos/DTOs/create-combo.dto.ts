@@ -1,15 +1,24 @@
 /* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-import { IsString, IsNumber } from 'class-validator';
+ 
+import { IsString, IsNumber, IsUUID, IsPositive, IsInt, Min } from 'class-validator';
 
 export class CreateComboDto {
   @IsString()
   name: string;
 
   @IsNumber()
+  @IsPositive()
   price: number;
+
+  @IsInt()
+  @IsPositive()
   year: number;
+
+  @IsInt()
+  @Min(1)
   minPersons: number;
 
-    eventId: string; 
+  @IsString()
+  @IsUUID()
+  eventId: string;
 }

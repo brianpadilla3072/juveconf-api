@@ -1,20 +1,19 @@
 /* eslint-disable prettier/prettier */
- 
-import { UserRole , AuthProvider} from '@prisma/client';
-import { IsNotEmpty, IsString, IsEmail, MinLength, IsEnum, IsOptional, IsBoolean, IsUrl } from 'class-validator';
+import { UserRole, AuthProvider } from '@prisma/client';
+import { IsString, IsEmail, MinLength, IsEnum, IsOptional, IsBoolean, IsUrl } from 'class-validator';
 
-export class CreateUserDto {
+export class UpdateUserDto {
   @IsOptional()
   @IsString({ message: 'El auth0Id debe ser un texto válido.' })
   auth0Id?: string;
 
   @IsOptional()
   @IsEnum(AuthProvider, { message: 'El proveedor de autenticación no es válido.' })
-  provider?: AuthProvider = AuthProvider.LOCAL;
+  provider?: AuthProvider;
 
-  @IsNotEmpty({ message: 'El nombre no puede estar vacío.' })
+  @IsOptional()
   @IsString({ message: 'El nombre debe ser un texto.' })
-  name: string;
+  name?: string;
 
   @IsOptional()
   @IsString({ message: 'El nombre de pila debe ser un texto.' })
@@ -28,9 +27,9 @@ export class CreateUserDto {
   @IsString({ message: 'El apodo debe ser un texto.' })
   nickname?: string;
 
-  @IsNotEmpty({ message: 'El correo es obligatorio.' })
+  @IsOptional()
   @IsEmail({}, { message: 'Debe ser un correo válido.' })
-  email: string;
+  email?: string;
 
   @IsOptional()
   @IsBoolean({ message: 'emailVerified debe ser true o false.' })
@@ -44,15 +43,16 @@ export class CreateUserDto {
   @IsString({ message: 'El locale debe ser un texto.' })
   locale?: string;
 
-  @IsNotEmpty({ message: 'La contraseña es obligatoria.' })
+  @IsOptional()
   @IsString({ message: 'La contraseña debe ser un texto.' })
   @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres.' })
-  password: string;
+  password?: string;
 
+  @IsOptional()
   @IsEnum(UserRole, { message: 'El rol debe ser válido.' })
-  role: UserRole;
+  role?: UserRole;
 
-  @IsNotEmpty({ message: 'El DNI es obligatorio.' })
+  @IsOptional()
   @IsString({ message: 'El DNI debe ser un texto.' })
-  dni: string;
+  dni?: string;
 }

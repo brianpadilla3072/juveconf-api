@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+ 
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString } from "class-validator";
 import { PaymentType } from '@prisma/client'; 
 

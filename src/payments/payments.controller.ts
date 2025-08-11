@@ -1,6 +1,4 @@
 /* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable prettier/prettier */
 // src/payments/payments.controller.ts
 // src/payments/payments.controller.ts
 import { Controller, Get, Post, Body, Param, Put, Delete, Query } from '@nestjs/common';

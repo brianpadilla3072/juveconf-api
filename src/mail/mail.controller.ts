@@ -1,8 +1,7 @@
-/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-// eslint-disable-next-line prettier/prettier
+
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable prettier/prettier */
 import { Controller, Post, Body, UsePipes, ValidationPipe, HttpException, HttpStatus, Logger, Get } from '@nestjs/common';
