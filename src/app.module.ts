@@ -19,6 +19,8 @@ import { json } from 'express';
 import { EventModule } from './events/event.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { AuthModule } from './auth/auth.module';
+import { InviteesModule } from './invitees/invitees.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -35,6 +37,8 @@ import { AuthModule } from './auth/auth.module';
     EventModule,
     TransfersModule,
     AuthModule,
+    InviteesModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

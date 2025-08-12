@@ -28,6 +28,22 @@ export class InviteesService {
     });
   }
 
+  async findOne(id: string) {
+    const invitee = await this.prisma.invitee.findUnique({
+      where: { id },
+      include: {
+        payment: true,
+        order: true,
+      },
+    });
+
+    if (!invitee || invitee.deletedAt) {
+      throw new NotFoundException('Invitee not found');
+    }
+
+    return invitee;
+  }
+
   async create(data: CreateInviteeDto) {
     return this.prisma.invitee.create({
       data,

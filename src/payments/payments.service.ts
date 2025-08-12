@@ -156,7 +156,7 @@ export class PaymentsService {
       });
 
       // Payments por mes (últimos 12 meses)
-      const paymentsByMonth = await this.prisma.$queryRaw`
+      const paymentsByMonthRaw = await this.prisma.$queryRaw`
         SELECT 
           DATE_TRUNC('month', "createdAt") as month,
           SUM(amount) as total_amount,
@@ -167,6 +167,13 @@ export class PaymentsService {
         GROUP BY DATE_TRUNC('month', "createdAt")
         ORDER BY month DESC
       `;
+
+      // Convert BigInt values to numbers
+      const paymentsByMonth = (paymentsByMonthRaw as any[]).map(row => ({
+        ...row,
+        total_amount: row.total_amount ? Number(row.total_amount) : 0,
+        count: row.count ? Number(row.count) : 0,
+      }));
 
       // Top eventos con más ingresos
       const topEventsByRevenue = await this.prisma.payment.groupBy({
@@ -369,7 +376,7 @@ export class PaymentsService {
       });
 
       // Crecimiento mensual (últimos 6 meses)
-      const monthlyGrowth = await this.prisma.$queryRaw`
+      const monthlyGrowthRaw = await this.prisma.$queryRaw`
         SELECT 
           DATE_TRUNC('month', "createdAt") as month,
           SUM(amount) as total_amount,
@@ -381,6 +388,14 @@ export class PaymentsService {
         GROUP BY DATE_TRUNC('month', "createdAt")
         ORDER BY month ASC
       `;
+
+      // Convert BigInt values to numbers
+      const monthlyGrowth = (monthlyGrowthRaw as any[]).map(row => ({
+        ...row,
+        total_amount: row.total_amount ? Number(row.total_amount) : 0,
+        count: row.count ? Number(row.count) : 0,
+        avg_amount: row.avg_amount ? Number(row.avg_amount) : 0,
+      }));
 
       return {
         total: {

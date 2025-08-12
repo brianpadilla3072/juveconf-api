@@ -7,6 +7,7 @@ import {
   Param,
   Put,
   Patch,
+  Delete,
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { EventService } from './event.service';
@@ -45,5 +46,10 @@ export class EventController {
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateEventDto) {
     return this.eventService.update(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.eventService.remove(id);
   }
 }

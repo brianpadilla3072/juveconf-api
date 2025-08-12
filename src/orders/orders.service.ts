@@ -186,7 +186,9 @@ export class OrdersService {
 
   async approveOrder(orderId: string): Promise<{success: boolean, data: Order}> {
     
-    return this.prisma.$transaction(async (tx) => {
+    let emailData: any; // Variable para almacenar datos del email
+    
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Actualizar el estado de la orden
       const order = await tx.order.update({
         where: { id: orderId },
@@ -233,6 +235,8 @@ export class OrdersService {
           )
         );
       }
+      
+      // 5. Preparar datos del email (NO enviarlo dentro de la transacción)
       const template = `<!DOCTYPE html>
 <html lang="es">
   <head>
@@ -281,14 +285,39 @@ export class OrdersService {
   </body>
 </html>
 
-      `
-    await this.mailService.sendCustomEmail(order.email,template,`YA PODES DESCARGAR TUS ENTRADAS: ${payment.id} `)
+      `;
+      
+      emailData = {
+        to: order.email,
+        html: template,
+        subject: `YA PODES DESCARGAR TUS ENTRADAS: ${payment.id}`
+      };
+      
       return { success: true, data: order };
     }, {
       maxWait: 5000,
       timeout: 10000,
       isolationLevel: 'Serializable'
     });
+    
+    // 6. Enviar email FUERA de la transacción
+    if (emailData) {
+      try {
+        // Timeout de 5 segundos para evitar que se cuelgue
+        const emailPromise = this.mailService.sendCustomEmail(emailData.to, emailData.html, emailData.subject);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Email timeout')), 5000)
+        );
+        
+        await Promise.race([emailPromise, timeoutPromise]);
+        this.logger.log(`Email enviado exitosamente a ${emailData.to}`);
+      } catch (error) {
+        this.logger.error(`Error al enviar email: ${error.message}`);
+        // El email falló, pero la orden ya está aprobada
+      }
+    }
+    
+    return result;
   }
 
   async deleteOrder(orderId: string): Promise<Order> {

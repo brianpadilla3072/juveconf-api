@@ -33,4 +33,11 @@ export class EventService {
       data,
     });
   }
+
+  remove(id: string) {
+    return this.prisma.event.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
 }

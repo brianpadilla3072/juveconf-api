@@ -1,7 +1,19 @@
 /* eslint-disable prettier/prettier */
-import { Body, Controller, Get, Param, ParseUUIDPipe, Query, Patch } from '@nestjs/common';
+import { 
+  Body, 
+  Controller, 
+  Get, 
+  Param, 
+  ParseUUIDPipe, 
+  Query, 
+  Patch, 
+  Post, 
+  Delete,
+  HttpCode,
+  HttpStatus
+} from '@nestjs/common';
 import { InviteesService } from './invitees.service';
-import { FilterInviteesDto } from './DTOs';
+import { FilterInviteesDto, CreateInviteeDto, UpdateInviteeDto } from './DTOs';
 import { MarkAttendanceDto } from './DTOs/mark-attendance.dto';
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -15,16 +27,49 @@ export class InviteesController {
   @Get()
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
-
   findAll(@Query() filter: FilterInviteesDto) {
     return this.inviteesService.findAll(filter);
   }
-    @Patch(':id/attendance')
-  async markAttendance(
+
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  create(@Body() createInviteeDto: CreateInviteeDto) {
+    return this.inviteesService.create(createInviteeDto);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  findOne(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.inviteesService.findOne(id);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  update(
+    @Param('id', new ParseUUIDPipe()) id: string, 
+    @Body() updateInviteeDto: UpdateInviteeDto
+  ) {
+    return this.inviteesService.update(id, updateInviteeDto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.inviteesService.remove(id);
+  }
+
+  @Patch(':id/attendance')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  markAttendance(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() data: MarkAttendanceDto,
   ) {
     return this.inviteesService.markAttendance(id, data);
   }
-
 }
