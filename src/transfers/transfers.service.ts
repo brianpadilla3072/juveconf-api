@@ -381,6 +381,116 @@ export class TransfersService {
       orderID: createdOrder!.id
     };
   }
+
+  // Crea una orden de pago en efectivo SIN enviar email (versión simple)
+  async createCashOrderSimple(dto: CreatePreferenceDto): Promise<{ success: true, orderID: string | null }> {
+    console.log('[createCashOrderSimple] Inicio con DTO:', dto);
+
+    // 1) Obtener combo
+    const combo = await this.prisma.combo.findUnique({ where: { id: dto.id } });
+    if (!combo) {
+      console.warn('[createCashOrderSimple] Combo no encontrado:', dto.id);
+      throw new CustomError(404, 'Combo no encontrado', 'No pudimos encontrar el combo solicitado.');
+    }
+    console.log('[createCashOrderSimple] Combo encontrado:', combo);
+
+    const payloadForCheck = { comboId: dto.id, email: dto.email, cuil: dto.cuil };
+    console.log('[createCashOrderSimple] Payload para validación:', payloadForCheck);
+
+    // 2) Validar órdenes en review por efectivo
+    const reviewOrders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.REVIEW,
+        paymentType: PaymentType.CASH,
+        eventId: dto.eventId,
+      },
+    });
+    console.log(`[createCashOrderSimple] Órdenes en review encontradas: ${reviewOrders.length}`);
+
+    for (const order of reviewOrders) {
+      if (!order.metadataToken) {
+        console.log(`[createCashOrderSimple] Orden ${order.id} sin metadataToken, se omite.`);
+        continue;
+      }
+      let existing: Record<string, any> | null;
+      try {
+        existing = this.jwtService.verifyMetadata(order.metadataToken);
+        console.log(`[createCashOrderSimple] Metadata verificada para orden ${order.id}:`, existing);
+      } catch (err) {
+        console.warn(`[createCashOrderSimple] Error al verificar metadata para orden ${order.id}, se omite.`, err);
+        continue;
+      }
+
+      if (
+        existing?.comboId === payloadForCheck.comboId &&
+        existing?.email === payloadForCheck.email &&
+        existing?.cuil === payloadForCheck.cuil
+      ) {
+        console.warn('[createCashOrderSimple] Orden en review existente detectada, se aborta.');
+        throw new CustomError(
+          400,
+          'Orden en review existente',
+          'Ya existe una orden en review de pago en efectivo para este combo con este email y CUIL.'
+        );
+      }
+    }
+
+    // 3) Crear nueva orden y metadata
+    let createdOrder: Order;
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const totalAmount = combo.price * dto.quantity;
+        console.log('[createCashOrderSimple] Total calculado:', totalAmount);
+
+        const order = await tx.order.create({
+          data: {
+            total: totalAmount,
+            status: OrderStatus.REVIEW,
+            paymentType: PaymentType.CASH,
+            year: 2025,
+            eventId: dto.eventId,
+            email: dto.email,
+            cuil: dto.cuil,
+          },
+        });
+        console.log('[createCashOrderSimple] Orden creada:', order.id);
+
+        const metadataPayload = {
+          orderId: order.id,
+          userId: dto.userId || null,
+          eventId: dto.eventId,
+          comboId: combo.id,
+          quantity: dto.quantity,
+          email: dto.email,
+          cuil: dto.cuil,
+          totalAmount,
+          currency: 'ARS',
+          attendees: dto.attendees,
+        };
+
+        const metadataToken = this.jwtService.signMetadata(metadataPayload);
+        console.log('[createCashOrderSimple] Metadata token generado.');
+
+        await tx.order.update({
+          where: { id: order.id },
+          data: { metadataToken },
+        });
+        createdOrder = order;
+        console.log('[createCashOrderSimple] Orden actualizada con metadata.');
+      });
+    } catch (error) {
+      console.error('[createCashOrderSimple] Error al crear orden:', error);
+      if (error instanceof CustomError) throw error;
+      throw new CustomError(500, 'Error inesperado', 'Hubo un error al crear la orden de pago en efectivo.');
+    }
+
+    console.log('[createCashOrderSimple] Orden de pago en efectivo creada exitosamente (sin email).');
+    
+    return { 
+      success: true, 
+      orderID: createdOrder!.id
+    };
+  }
   
   // verifica la transferencia para una cuenta de mp con numero de operacion
   // async verifyTransferDeMercadoPago(paymentId: number, orderId: string) {

@@ -54,5 +54,13 @@ export class TransfersController {
   ) {
     return this.transfersService.createCashOrder(dto);
   }
+
+  @Post('create-cash-order-simple')
+  @HttpCode(HttpStatus.CREATED)
+  async createCashOrderSimple(
+    @Body() dto: CreatePreferenceDto,
+  ) {
+    return this.transfersService.createCashOrderSimple(dto);
+  }
 }
 
