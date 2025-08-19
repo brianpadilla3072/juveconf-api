@@ -412,4 +412,58 @@ export class PaymentsService {
       throw new InternalServerErrorException('Error al obtener estadísticas de pagos');
     }
   }
+
+  async getPaymentsEmails() {
+    try {
+      const payments = await this.prisma.payment.findMany({
+        where: {
+          deletedAt: null,
+          AND: [
+            { payerEmail: { not: null } },
+            { payerEmail: { not: '' } },
+          ],
+        },
+        select: {
+          id: true,
+          payerName: true,
+          payerEmail: true,
+          amount: true,
+          type: true,
+          year: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      // Eliminar emails duplicados usando Map
+      const uniqueEmails = new Map();
+      payments.forEach(payment => {
+        if (!uniqueEmails.has(payment.payerEmail)) {
+          uniqueEmails.set(payment.payerEmail, {
+            email: payment.payerEmail,
+            name: payment.payerName || 'Sin nombre',
+            id: payment.id,
+            paymentInfo: {
+              amount: payment.amount,
+              type: payment.type,
+              year: payment.year,
+              createdAt: payment.createdAt,
+            },
+          });
+        }
+      });
+
+      const uniqueEmailsArray = Array.from(uniqueEmails.values());
+
+      return {
+        emails: uniqueEmailsArray,
+        total: uniqueEmailsArray.length,
+      };
+    } catch (error) {
+      console.error('[getPaymentsEmails] Error:', error);
+      throw new InternalServerErrorException('Error al obtener emails de pagos');
+    }
+  }
 }

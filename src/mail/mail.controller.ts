@@ -31,6 +31,25 @@ class SendEmailDto {
   attachments?: any[];
 }
 
+class SendBulkEmailDto {
+  @IsString()
+  @IsNotEmpty()
+  subject: string;
+
+  @IsString()
+  @IsNotEmpty()
+  htmlContent: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  recipients: string[];
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+}
+
 @ApiTags('Correo Electrónico')
 @Controller('mail')
 export class MailController {
@@ -77,9 +96,42 @@ export class MailController {
     }
   }
   @Get('templates')
-@ApiOperation({ summary: 'Listar nombres de plantillas disponibles' })
-@ApiResponse({ status: 200, description: 'Lista de plantillas disponibles' })
-getTemplates() {
-  return this.mailService.getTemplateNames();
-}
+  @ApiOperation({ summary: 'Listar nombres de plantillas disponibles' })
+  @ApiResponse({ status: 200, description: 'Lista de plantillas disponibles' })
+  getTemplates() {
+    return this.mailService.getTemplateNames();
+  }
+
+  @Post('send-bulk')
+  @ApiOperation({ summary: 'Enviar emails masivos con HTML personalizado' })
+  @ApiResponse({ status: 200, description: 'Emails enviados correctamente' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 500, description: 'Error interno al enviar emails' })
+  @ApiBody({ type: SendBulkEmailDto })
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async sendBulkEmail(@Body() dto: SendBulkEmailDto) {
+    try {
+      this.logger.log(`Enviando email masivo a ${dto.recipients.length} destinatarios`);
+
+      const result = await this.mailService.sendBulkHtml(
+        dto.subject,
+        dto.htmlContent,
+        dto.recipients,
+        dto.from
+      );
+
+      return {
+        success: true,
+        totalSent: dto.recipients.length,
+        recipients: dto.recipients,
+        result
+      };
+    } catch (error) {
+      this.logger.error(`Error al enviar emails masivos: ${error.message}`);
+      throw new HttpException(
+        error.message || 'Error interno al enviar emails masivos',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

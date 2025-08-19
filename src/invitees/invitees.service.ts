@@ -90,4 +90,55 @@ export class InviteesService {
     },
   });
 }
+
+async getInviteesEmails(filter: FilterInviteesDto) {
+  const year = filter.year ?? new Date().getFullYear();
+
+  const invitees = await this.prisma.invitee.findMany({
+    where: {
+      deletedAt: null,
+      AND: [
+        { email: { not: null } },
+        { email: { not: '' } },
+      ],
+      payment: {
+        is: {
+          year: year,
+        },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      payment: {
+        select: {
+          id: true,
+          amount: true,
+          type: true,
+        },
+      },
+    },
+  });
+
+  // Eliminar emails duplicados usando Map
+  const uniqueEmails = new Map();
+  invitees.forEach(invitee => {
+    if (!uniqueEmails.has(invitee.email)) {
+      uniqueEmails.set(invitee.email, {
+        email: invitee.email,
+        name: invitee.name,
+        id: invitee.id,
+        paymentInfo: invitee.payment,
+      });
+    }
+  });
+
+  const uniqueEmailsArray = Array.from(uniqueEmails.values());
+
+  return {
+    emails: uniqueEmailsArray,
+    total: uniqueEmailsArray.length,
+  };
+}
 }

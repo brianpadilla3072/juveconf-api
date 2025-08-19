@@ -31,6 +31,13 @@ export class InviteesController {
     return this.inviteesService.findAll(filter);
   }
 
+  @Get('emails/list')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  getInviteesEmails(@Query() filter: FilterInviteesDto) {
+    return this.inviteesService.getInviteesEmails(filter);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)

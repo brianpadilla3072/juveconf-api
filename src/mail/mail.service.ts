@@ -65,6 +65,68 @@ export class MailService {
       throw error;
     }
   }
+
+  /**
+   * Envía emails masivos con HTML personalizado
+   */
+  async sendBulkHtml(
+    subject: string,
+    htmlContent: string,
+    recipients: string[],
+    from?: string
+  ) {
+    try {
+      this.logger.log(`Enviando email masivo a ${recipients.length} destinatarios`);
+      
+      const results: Array<{ recipient: string; success: boolean; messageId?: any; error?: any }> = [];
+      const batchSize = 10; // Enviar en lotes para evitar sobrecarga
+      
+      for (let i = 0; i < recipients.length; i += batchSize) {
+        const batch = recipients.slice(i, i + batchSize);
+        this.logger.log(`Enviando lote ${Math.floor(i / batchSize) + 1} de ${Math.ceil(recipients.length / batchSize)}`);
+        
+        const batchPromises = batch.map(async (recipient) => {
+          try {
+            const result = await this.mailer.sendMail({
+              from: from || this.defaultFrom,
+              to: recipient,
+              subject: subject,
+              html: htmlContent,
+            });
+            
+            this.logger.log(`Email enviado exitosamente a ${recipient}`);
+            return { recipient, success: true, messageId: result.messageId };
+          } catch (error) {
+            this.logger.error(`Error enviando email a ${recipient}: ${error.message}`);
+            return { recipient, success: false, error: error.message };
+          }
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
+        
+        // Pequeña pausa entre lotes para no sobrecargar el servidor SMTP
+        if (i + batchSize < recipients.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      const successCount = results.filter(r => r.success).length;
+      const failureCount = results.filter(r => !r.success).length;
+      
+      this.logger.log(`Email masivo completado. Exitosos: ${successCount}, Fallidos: ${failureCount}`);
+      
+      return {
+        totalSent: recipients.length,
+        successful: successCount,
+        failed: failureCount,
+        results
+      };
+    } catch (error) {
+      this.logger.error(`Error en envío masivo: ${error.message}`);
+      throw error;
+    }
+  }
   /**
    * Obtiene la plantilla según el nombre
    */

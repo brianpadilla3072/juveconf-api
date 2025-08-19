@@ -21,26 +21,6 @@ export class PaymentsController {
     return this.paymentsService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.paymentsService.findOne(id);
-  }
-
-  @Put(':id')
-  update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
-    return this.paymentsService.update(id, updatePaymentDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.paymentsService.remove(id);
-  }
-
-  @Get(':paymentId/invitees')
-  getPaymentWithInvitees(@Param('paymentId') paymentId: string) {
-    return this.paymentsService.getPaymentWithInvitees(paymentId);
-  }
-
   // Dashboard endpoints
   @Get('dashboard/summary')
   getDashboardSummary(@Query() filters: DashboardFilterDto) {
@@ -69,5 +49,30 @@ export class PaymentsController {
   @Get('dashboard/statistics')
   getPaymentStatistics() {
     return this.paymentsService.getPaymentStatistics();
+  }
+
+  @Get('emails/list')
+  getPaymentsEmails() {
+    return this.paymentsService.getPaymentsEmails();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.paymentsService.findOne(id);
+  }
+
+  @Put(':id')
+  update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
+    return this.paymentsService.update(id, updatePaymentDto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.paymentsService.remove(id);
+  }
+
+  @Get(':paymentId/invitees')
+  getPaymentWithInvitees(@Param('paymentId') paymentId: string) {
+    return this.paymentsService.getPaymentWithInvitees(paymentId);
   }
 }
