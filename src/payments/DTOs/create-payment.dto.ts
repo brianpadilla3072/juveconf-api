@@ -7,7 +7,7 @@ export class CreatePaymentDto {
   @IsNotEmpty()
   year: number;
   
-  @IsInt()
+  @IsString()
   @IsNotEmpty()
   orderId: string;
 
@@ -24,7 +24,7 @@ export class CreatePaymentDto {
   externalReference?: string;
 
   @IsOptional()
-  @IsInt()
+  @IsString()
   userId?: string;
 
   @IsOptional()

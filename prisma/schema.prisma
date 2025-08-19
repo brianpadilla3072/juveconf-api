@@ -165,6 +165,8 @@ model Invitee {
   id              String        @id @default(uuid())
   name            String
   cuil             String
+  email           String?
+  phone           String?
   orderId         String?
   order           Order?        @relation(fields: [orderId], references: [id])
   paymentId       String?

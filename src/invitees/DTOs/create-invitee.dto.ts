@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID, IsEmail } from 'class-validator';
 
 export class CreateInviteeDto {
   @IsString()
@@ -6,6 +6,14 @@ export class CreateInviteeDto {
 
   @IsString()
   cuil: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
 
   @IsOptional()
   @IsUUID()
