@@ -21,6 +21,7 @@ import { TransfersModule } from './transfers/transfers.module';
 import { AuthModule } from './auth/auth.module';
 import { InviteesModule } from './invitees/invitees.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { FinanzasModule } from './finanzas/finanzas.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     AuthModule,
     InviteesModule,
     DashboardModule,
+    FinanzasModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

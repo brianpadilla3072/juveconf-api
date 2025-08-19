@@ -177,3 +177,29 @@ model Invitee {
   updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?
 }
+
+model Ingreso {
+  id            String    @id @default(uuid())
+  fecha         DateTime
+  concepto      String
+  monto         Float
+  metodoPago    String
+  notas         String?
+  year          Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+}
+
+model Egreso {
+  id            String    @id @default(uuid())
+  fecha         DateTime
+  concepto      String
+  monto         Float
+  metodoPago    String
+  notas         String?
+  year          Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+}
