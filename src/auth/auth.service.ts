@@ -44,7 +44,7 @@ export class AuthService {
     const isValid = await this.validateUser(email, password);
 
     if (!isValid) {
-      throw new Error('Invalid credentials');
+      throw new UnauthorizedException('Credenciales inválidas. Verifica tu email y contraseña.');
     }
 
     // Aquí generas el token JWT, puedes incluir más datos si lo necesitas

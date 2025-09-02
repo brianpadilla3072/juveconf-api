@@ -11,8 +11,15 @@ async function bootstrap() {
    app.useGlobalPipes(new ValidationPipe({
     transform: true,
     whitelist: true,
-      transformOptions: { enableImplicitConversion: true },
-
+    forbidNonWhitelisted: true,
+    transformOptions: { enableImplicitConversion: true },
+    exceptionFactory: (errors) => {
+      const messages = errors.map(error => {
+        const constraints = error.constraints;
+        return Object.values(constraints || {}).join(', ');
+      });
+      return new ValidationPipe().createExceptionFactory()(errors);
+    },
   }));
 
   app.enableCors({

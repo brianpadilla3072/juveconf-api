@@ -139,7 +139,7 @@ export class OrdersService {
     return filteredOrders;  // Retornar las órdenes filtradas
   }
   async getOrdersByStatus(status: OrderStatus) {
-    return this.prisma.order.findMany({
+    const orders = await this.prisma.order.findMany({
       where: { 
         status,
         deletedAt: null
@@ -154,6 +154,41 @@ export class OrdersService {
       orderBy: {
         createdAt: 'desc'
       }
+    });
+
+    // Para cada orden, si no tiene invitados creados pero tiene metadataToken, extraer los attendees
+    return orders.map(order => {
+      if (order.invitees.length === 0 && order.metadataToken) {
+        try {
+          const metadataPayload = this.jwtService.decodeMetadata(order.metadataToken);
+          if (metadataPayload?.attendees?.length) {
+            // Crear invitados virtuales a partir del token
+            const virtualInvitees = metadataPayload.attendees.map(attendee => ({
+              id: `virtual-${order.id}-${attendee.cuil}`,
+              name: attendee.name,
+              cuil: attendee.cuil,
+              orderId: order.id,
+              paymentId: null,
+              attendedDay1: false,
+              attendedDay2: false,
+              createdAt: order.createdAt,
+              updatedAt: order.updatedAt,
+              deletedAt: null,
+              email: null,
+              phone: null
+            }));
+            
+            return {
+              ...order,
+              invitees: virtualInvitees
+            };
+          }
+        } catch (error) {
+          this.logger.warn(`[OrdersService] Error al decodificar metadataToken para orden ${order.id}:`, error.message);
+        }
+      }
+      
+      return order;
     });
   }
 
@@ -321,27 +356,34 @@ export class OrdersService {
   }
 
   async deleteOrder(orderId: string): Promise<Order> {
-    // First, check if the order has any payments
-    const orderWithPayments = await this.prisma.order.findUnique({
+    // First, check if the order exists
+    const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { payments: true }
+      include: { 
+        payments: true,
+        invitees: true
+      }
     });
 
-    if (!orderWithPayments) {
+    if (!order) {
       throw new NotFoundException('Order not found');
     }
 
     // If the order has payments, throw an error
-    if (orderWithPayments.payments && orderWithPayments.payments.length > 0) {
+    if (order.payments && order.payments.length > 0) {
       throw new BadRequestException('Cannot delete an order with associated payments');
     }
 
-    // Perform logical deletion by setting deletedAt
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: { 
-        deletedAt: new Date() 
-      }
+    // Delete related invitees first (if any)
+    if (order.invitees && order.invitees.length > 0) {
+      await this.prisma.invitee.deleteMany({
+        where: { orderId: orderId }
+      });
+    }
+
+    // Perform physical deletion
+    return this.prisma.order.delete({
+      where: { id: orderId }
     });
   }
 

@@ -23,11 +23,12 @@ export class DashboardService {
         _count: { id: true }
       }),
       
-      // Órdenes pendientes
+      // Órdenes pendientes (excluyendo MercadoPago)
       this.prisma.order.count({
         where: { 
           year: year,
           status: { in: ['PENDING', 'REVIEW'] },
+          paymentType: { not: 'MERCADOPAGO' },
           deletedAt: null 
         }
       }),
@@ -403,6 +404,7 @@ export class DashboardService {
       where: { 
         year: year,
         status: { in: ['PENDING', 'REVIEW'] },
+        paymentType: { not: 'MERCADOPAGO' },
         deletedAt: null 
       },
       select: {
