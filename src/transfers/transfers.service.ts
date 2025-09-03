@@ -109,6 +109,7 @@ export class TransfersService {
             status: OrderStatus.PENDING,
             email: dto.email,
             cuil: dto.cuil,
+            phone: dto.phone,
             paymentType: PaymentType.TRANSFER,
             combos: { connect: [{ id: combo.id }] },
           },
@@ -122,6 +123,7 @@ export class TransfersService {
           comboId: combo.id,
           quantity: dto.quantity,
           email: dto.email,
+          phone: dto.phone,
           cuil: dto.cuil,
           totalAmount,
           currency: 'ARS',
@@ -270,6 +272,7 @@ export class TransfersService {
             status: OrderStatus.REVIEW,
             email: dto.email,
             cuil: dto.cuil,
+            phone: dto.phone,
             paymentType: PaymentType.CASH,
             combos: { connect: [{ id: combo.id }] },
           },
@@ -283,6 +286,7 @@ export class TransfersService {
           comboId: combo.id,
           quantity: dto.quantity,
           email: dto.email,
+          phone: dto.phone,
           cuil: dto.cuil,
           totalAmount,
           currency: 'ARS',
@@ -451,6 +455,7 @@ export class TransfersService {
             eventId: dto.eventId,
             email: dto.email,
             cuil: dto.cuil,
+            phone: dto.phone,
           },
         });
         console.log('[createCashOrderSimple] Orden creada:', order.id);
@@ -462,6 +467,7 @@ export class TransfersService {
           comboId: combo.id,
           quantity: dto.quantity,
           email: dto.email,
+          phone: dto.phone,
           cuil: dto.cuil,
           totalAmount,
           currency: 'ARS',
@@ -544,6 +550,7 @@ export class TransfersService {
   //         payerEmail: payment.payer?.email || payload.metadata?.email,
   //         payerName: ` ${payment.payer?.first_name} ${payment.payer?.last_name} -${payment.payer?.email} - phone ${payment.payer?.phone.number} - ${payment.payer?.identification.number} ${payment.payer?.identification.type}`,
   //         payerDni: String(payment.payer?.identification.number || payload.metadata?.cuil),
+  //         payerPhone: payment.payer?.phone?.number || payload.metadata?.phone,
   //       },
   //     });
 
@@ -663,6 +670,7 @@ export class TransfersService {
   //         payerEmail: payment.payer?.email || payload.metadata?.email,
   //         payerName: ` ${payment.payer?.first_name} ${payment.payer?.last_name} -${payment.payer?.email} - phone ${payment.payer?.phone.number} - ${payment.payer?.identification.number} ${payment.payer?.identification.type}`,
   //         payerDni: String(payment.payer?.identification.number || payload.metadata?.cuil),
+  //         payerPhone: payment.payer?.phone?.number || payload.metadata?.phone,
   //       },
   //     });
 

@@ -16,6 +16,7 @@ export interface MetadataPayload {
   comboId: string;
   quantity: number;
   email: string;
+  phone?: string;
   cuil: string;
   totalAmount: number;
   currency: string;

@@ -17,6 +17,10 @@ export class CreatePreferenceDto {
 
   @IsEmail()
   email: string;
+
+  @IsString()
+  phone: string;
+  
   @IsString()
   @Matches(/^\d{7,11}$/)
   cuil: string;

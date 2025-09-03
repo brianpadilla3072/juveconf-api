@@ -94,6 +94,7 @@ export class MercadopagoService {
           paymentType: PaymentType.MERCADOPAGO,
           email: dto.email,
           cuil: dto.cuil,
+          phone: dto.phone,
           combos: { connect: [{ id: combo.id }] },
         },
       });
@@ -106,6 +107,7 @@ export class MercadopagoService {
         comboId: combo.id,
         quantity: dto.quantity,
         email: dto.email,
+        phone: dto.phone,
         cuil: dto.cuil,
         totalAmount,
         currency: 'ARS',
@@ -244,6 +246,7 @@ export class MercadopagoService {
         payerEmail: mpPayment.payer?.email || payload.metadata?.email,
         payerName: ` ${mpPayment.payer?.first_name} ${mpPayment.payer?.last_name} -${mpPayment.payer?.email} - phone ${mpPayment.payer?.phone.number} - ${mpPayment.payer?.identification.number} ${mpPayment.payer?.identification.type}`,
         payerDni: String(mpPayment.payer?.identification.number || payload.metadata?.cuil),
+        payerPhone: mpPayment.payer?.phone?.number || payload.metadata?.phone,
       },
     });
     this.logger.debug(`Pago registrado: ID=${payment.id}`);

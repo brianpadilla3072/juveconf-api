@@ -132,6 +132,7 @@ model Order {
   deletedAt         DateTime?
   email             String
   cuil              String
+  phone             String?
   payments          Payment[]
   invitees          Invitee[]
 }
@@ -153,6 +154,7 @@ model Payment {
   payerName         String?
   payerEmail        String?
   payerDni          String?
+  payerPhone        String?
 
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt

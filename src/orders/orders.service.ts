@@ -35,8 +35,9 @@ export class OrdersService {
     metadataToken: string;
     email: string;
     cuil: string;
+    phone?: string;
   }) {
-    const { userId, comboId, paymentType, quantity, unitPrice, metadataToken, id,email,cuil } = data;
+    const { userId, comboId, paymentType, quantity, unitPrice, metadataToken, id,email,cuil,phone } = data;
     const year = new Date().getFullYear();
 
     // Buscar el combo
@@ -62,6 +63,7 @@ export class OrdersService {
         metadataToken,
         email,
         cuil,
+        phone,
         combos: {
           connect: [{ id: comboId }],
         },
@@ -156,13 +158,20 @@ export class OrdersService {
       }
     });
 
-    // Para cada orden, si no tiene invitados creados pero tiene metadataToken, extraer los attendees
+    // Para cada orden, extraer información del metadataToken incluyendo phone y attendees
     return orders.map(order => {
-      if (order.invitees.length === 0 && order.metadataToken) {
+      if (order.metadataToken) {
         try {
           const metadataPayload = this.jwtService.decodeMetadata(order.metadataToken);
-          if (metadataPayload?.attendees?.length) {
-            // Crear invitados virtuales a partir del token
+          
+          // Agregar phone del metadataToken si existe
+          const orderWithPhone = {
+            ...order,
+            phone: metadataPayload?.phone || null
+          };
+
+          // Si no tiene invitados creados pero tiene attendees en el token, crear invitados virtuales
+          if (order.invitees.length === 0 && metadataPayload?.attendees?.length) {
             const virtualInvitees = metadataPayload.attendees.map(attendee => ({
               id: `virtual-${order.id}-${attendee.cuil}`,
               name: attendee.name,
@@ -179,10 +188,12 @@ export class OrdersService {
             }));
             
             return {
-              ...order,
+              ...orderWithPhone,
               invitees: virtualInvitees
             };
           }
+
+          return orderWithPhone;
         } catch (error) {
           this.logger.warn(`[OrdersService] Error al decodificar metadataToken para orden ${order.id}:`, error.message);
         }
@@ -252,6 +263,7 @@ export class OrdersService {
           payerEmail: order.email || undefined,
           payerName: metadataPayload.name || undefined,
           payerDni: metadataPayload.cuil || undefined,
+          payerPhone: metadataPayload.phone || undefined,
         }
       });
 

@@ -38,4 +38,8 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsString()
   payerDni?: string;
+
+  @IsOptional()
+  @IsString()
+  payerPhone?: string;
 }

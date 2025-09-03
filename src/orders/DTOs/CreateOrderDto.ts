@@ -24,4 +24,7 @@ export class CreateOrderDto {
   email:string
   @IsString()
   cuil:string
+  @IsOptional()
+  @IsString()
+  phone?: string
 }
