@@ -27,12 +27,12 @@ export class OrdersController {
     }
     @Get('pending')
     @UseGuards(JwtAuthGuard)
-    @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+    @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
     getOrdersByPending() {
         return this.ordersService.getOrdersByStatus(OrderStatus.PENDING);
     }
     @UseGuards(JwtAuthGuard)
-    @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+    @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
     @Get('paid')
   getOrdersByPaid() {
     return this.ordersService.getOrdersByStatus(OrderStatus.PAID);

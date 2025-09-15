@@ -2,11 +2,14 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { PasswordService } from '../global/password.service';
 import { JwtService } from '@nestjs/jwt';
 import { RegisterUserDto } from './DTOs/register-user.dto';
+import { ChangePasswordDto } from './DTOs/change-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -100,5 +103,63 @@ export class AuthService {
     return this.prisma.user.findUnique({
       where: { email },
     });
+  }
+
+  // Método para cambiar contraseña
+  async changePassword(
+    email: string,
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    const { currentPassword, newPassword } = changePasswordDto;
+
+    // Buscar el usuario
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (!user.password) {
+      throw new BadRequestException(
+        'El usuario no tiene contraseña local asignada',
+      );
+    }
+
+    // Verificar que la contraseña actual sea correcta
+    const isCurrentPasswordValid = await this.passwordService.comparePasswords(
+      currentPassword,
+      user.password,
+    );
+
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('La contraseña actual es incorrecta');
+    }
+
+    // Verificar que la nueva contraseña sea diferente a la actual
+    const isSamePassword = await this.passwordService.comparePasswords(
+      newPassword,
+      user.password,
+    );
+
+    if (isSamePassword) {
+      throw new BadRequestException(
+        'La nueva contraseña debe ser diferente a la actual',
+      );
+    }
+
+    // Hashear la nueva contraseña
+    const hashedNewPassword = await this.passwordService.hashPassword(
+      newPassword,
+    );
+
+    // Actualizar la contraseña en la base de datos
+    await this.prisma.user.update({
+      where: { email },
+      data: { password: hashedNewPassword },
+    });
+
+    return { message: 'Contraseña actualizada exitosamente' };
   }
 }

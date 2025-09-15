@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   HttpCode,
   HttpStatus,
@@ -18,6 +19,7 @@ import { RegisterUserDto } from './DTOs/register-user.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Request } from 'express';
 import { UserProfileDto } from './DTOs/profile.dto';
+import { ChangePasswordDto } from './DTOs/change-password.dto';
 
 interface RequestWithUser extends Request {
   user: { email: string };
@@ -104,5 +106,44 @@ export class AuthController {
       lastLogin: user.lastLogin || undefined,
       deletedAt: user.deletedAt || undefined,
     });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile/password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Req() req: RequestWithUser,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    try {
+      this.logger.log(`Intento de cambio de contraseña para email: ${req.user.email}`);
+      
+      const result = await this.authService.changePassword(
+        req.user.email,
+        changePasswordDto,
+      );
+      
+      this.logger.log(`Contraseña cambiada exitosamente para email: ${req.user.email}`);
+      
+      return result;
+    } catch (error) {
+      // Log del error para depuración
+      this.logger.error(
+        `Error en cambio de contraseña para ${req.user.email}: ${error.message}`,
+        error.stack,
+      );
+      
+      // Re-lanzar errores HTTP conocidos
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error.name === 'UnauthorizedException'
+      ) {
+        throw error;
+      }
+      
+      // Para cualquier otro error, devolver un error interno del servidor
+      throw new InternalServerErrorException('Error interno del servidor');
+    }
   }
 }

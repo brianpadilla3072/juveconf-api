@@ -26,14 +26,14 @@ export class InviteesController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
   findAll(@Query() filter: FilterInviteesDto) {
     return this.inviteesService.findAll(filter);
   }
 
   @Get('emails/list')
   @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
   getInviteesEmails(@Query() filter: FilterInviteesDto) {
     return this.inviteesService.getInviteesEmails(filter);
   }
@@ -47,14 +47,14 @@ export class InviteesController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
   findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.inviteesService.findOne(id);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
   update(
     @Param('id', new ParseUUIDPipe()) id: string, 
     @Body() updateInviteeDto: UpdateInviteeDto
@@ -72,7 +72,7 @@ export class InviteesController {
 
   @Patch(':id/attendance')
   @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
   markAttendance(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() data: MarkAttendanceDto,
