@@ -6,6 +6,7 @@ import * as jwt from 'jsonwebtoken';
 export interface Attendee {
   name: string;
   cuil: string;
+  metadata?: string; // JSON string with email, phone, birthdate, city, church, merchandiseSizes
 }
 
 export interface MetadataPayload {

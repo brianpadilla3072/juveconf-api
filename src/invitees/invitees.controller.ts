@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { InviteesService } from './invitees.service';
 import { FilterInviteesDto, CreateInviteeDto, UpdateInviteeDto } from './DTOs';
-import { MarkAttendanceDto } from './DTOs/mark-attendance.dto';
+import { MarkAttendanceByDayDto } from './DTOs/mark-attendance.dto';
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
@@ -70,13 +70,18 @@ export class InviteesController {
     return this.inviteesService.remove(id);
   }
 
-  @Patch(':id/attendance')
+  /**
+   * Marca asistencia para un día específico (sistema dinámico)
+   * @param id - ID del invitado
+   * @param data - { dayNumber: number, attended: boolean, notes?: string }
+   */
+  @Patch(':id/attendance/day')
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
-  markAttendance(
+  markAttendanceByDay(
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() data: MarkAttendanceDto,
+    @Body() data: MarkAttendanceByDayDto,
   ) {
-    return this.inviteesService.markAttendance(id, data);
+    return this.inviteesService.markAttendanceByDay(id, data);
   }
 }

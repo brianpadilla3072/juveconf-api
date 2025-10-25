@@ -23,9 +23,10 @@ export class EventController {
   }
 
   @Get('current')
-  findCurrent() {
+  async findCurrent() {
     const currentYear = new Date().getFullYear();
-    return this.eventService.findByYear(currentYear);
+    const allEvents = await this.eventService.findAll();
+    return allEvents.filter(event => event.year === currentYear);
   }
 
   @Get(':id')

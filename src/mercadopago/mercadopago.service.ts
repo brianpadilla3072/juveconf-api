@@ -14,11 +14,13 @@ import { CombosService } from 'src/combos/combos.service';
 import { JwtService } from 'src/jwt/jwt.service';
 import { PrismaService } from 'prisma/prisma.service';
 import { OrderStatus } from 'src/orders/orders.service';
-import { PaymentType } from '@prisma/client';
+import { PaymentType, EmailType } from '@prisma/client';
 import { AttendeeDto, CreatePreferenceDto } from './DTOs/create-preference.dto';
 import { CustomError } from 'src/global/CustomError';
 import { firstValueFrom } from 'rxjs';
+import { APP_CONFIG, COLORS } from 'src/constants/app.constants';
 import { MailService } from 'src/mail/mail.service';
+import { EmailQueueService } from 'src/email-queue/email-queue.service';
 
 interface MetadataPayload {
   userId: string | null;
@@ -45,6 +47,7 @@ export class MercadopagoService {
     private readonly combosService: CombosService,
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
+    private readonly emailQueueService: EmailQueueService,
   ) {
     const token = process.env.MP_ACCESS_TOKEN!;
     this.mpConfig = new MercadoPagoConfig({ accessToken: token });
@@ -82,8 +85,36 @@ export class MercadopagoService {
 
     // 3) Transacción: crear orden, token con orderId, preferencia y actualizar orden
     return await this.prisma.$transaction(async (tx) => {
-      // 3.1) Crear orden pendiente (sin token ni referencia externa)
-      const totalAmount = combo.price ;
+      // 3.1) Obtener precio actual (con preventa si aplica)
+      const currentPrice = await this.combosService.getCurrentPrice(dto.id);
+      const priceWithFee = (currentPrice.price * 0.27) + currentPrice.price; // Fee de MercadoPago
+      const totalAmount = priceWithFee;
+
+      // 3.2) Crear snapshot de la orden
+      const orderSnapshot = {
+        combo: {
+          id: combo.id,
+          name: combo.name,
+          basePrice: combo.price,
+          appliedPrice: currentPrice.price,
+          priceWithFee: priceWithFee,
+          personsIncluded: combo.personsIncluded,
+          description: combo.description,
+        },
+        preSale: currentPrice.isPreSale ? {
+          id: currentPrice.preSaleId,
+          name: currentPrice.preSaleName,
+          discount: currentPrice.discount,
+        } : null,
+        mercadoPago: {
+          fee: priceWithFee - currentPrice.price,
+          feePercentage: 27,
+        },
+        timestamp: new Date().toISOString(),
+        quantity: dto.quantity,
+      };
+
+      // 3.3) Crear orden pendiente
       const order = await tx.order.create({
         data: {
           year: new Date().getFullYear(),
@@ -95,7 +126,8 @@ export class MercadopagoService {
           email: dto.email,
           cuil: dto.cuil,
           phone: dto.phone,
-          combos: { connect: [{ id: combo.id }] },
+          comboId: combo.id, // Relación directa one-to-one
+          orderSnapshot, // Guardar snapshot
         },
       });
 
@@ -290,56 +322,27 @@ export class MercadopagoService {
       }
 
       this.logger.log(`Se crearon ${attendees.length} asistentes para la orden ID=${order.id}`);
-      const template = `<!DOCTYPE html>
-      <html lang="es">
-        <head>
-          <meta charset="UTF-8" />
-          <title>Descargar Entrada</title>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; padding: 20px 0;">
-            <tr>
-              <td align="center">
-                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; padding: 30px; box-shadow: 0 0 5px rgba(0,0,0,0.1);">
-                  <tr>
-                    <td align="center" style="padding-bottom: 20px;">
-                      <h1 style="color: #2c3e50; margin: 0;">¡Gracias por tu compra!</h1>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td align="center" style="padding: 10px 0;">
-                      <p style="font-size: 16px; color: #333333; margin: 0;">El ID de tu Compra es:</p>
-                      <p style="font-size: 16px; font-weight: bold; color: #f76f1f; word-break: break-word; margin: 5px 0 20px;">${payment.id}</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td align="center">
-                      <p style="font-size: 16px; color: #333333; margin: 0 0 20px;">Hacé clic en el botón para ir a la página donde podés descargar tu entrada:</p>
-                      <a href="https://consagradosajesus.com/descargar-entrada/${payment.id}"
-                        style="background-color: #f76f1f; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 5px; display: inline-block; font-size: 16px; margin-top: 10px;">
-                        Ir a la página de descarga
-                      </a>
-                      <p style="font-size: 14px; color: #555555; margin-top: 20px;">
-                        O hacé clic en este enlace si el botón no funciona:<br />
-                        <a href="https://consagradosajesus.com/descargar-entrada/${payment.id}"
-                          style="color: #2980b9; text-decoration: underline;">https://consagradosajesus.com/descargar-entrada/${payment.id}</a>
-                      </p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td align="center" style="padding-top: 30px;">
-                      <p style="font-size: 12px; color: #999999;">Este mensaje fue generado automáticamente. Por favor no respondas este correo.</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-      
-            `
-          await this.mailService.sendCustomEmail(order.email,template,`YA PODES DESCARGAR TUS ENTRADAS: ${payment.id} `)
+
+      // Encolar email usando template de Handlebars
+      try {
+        await this.emailQueueService.enqueueTemplateEmail({
+          to: order.email,
+          subject: 'Tu entrada - JUVECONF 2025',
+          template: 'ticket-details',
+          context: {
+            userName: order.email.split('@')[0],
+            paymentId: payment.id,
+            ticketUrl: `${APP_CONFIG.url}/descargar-entrada/${payment.id}`,
+          },
+          emailType: EmailType.TICKET_DOWNLOAD,
+          orderId: order.id,
+          paymentId: payment.id,
+        });
+        this.logger.log(`Email encolado para ${order.email}`);
+      } catch (error: any) {
+        this.logger.error(`Error al encolar email: ${error.message}`);
+        // No interrumpimos el webhook por un error de encolado
+      }
     }
 
     this.logger.log('Notificación procesada correctamente.');

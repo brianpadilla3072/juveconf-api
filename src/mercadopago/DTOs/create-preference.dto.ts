@@ -9,6 +9,10 @@ export class AttendeeDto {
   @IsString()
   @Matches(/^\d{7,11}$/) // opcional, valida formato de CUIL
   cuil: string;
+
+  @IsOptional()
+  @IsString()
+  metadata?: string; // JSON string con: { email?, phone?, birthdate?, city?, church? }
 }
 
 export class CreatePreferenceDto {

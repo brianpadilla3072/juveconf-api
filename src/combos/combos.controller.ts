@@ -38,9 +38,9 @@ export class CombosController {
     return this.combosService.findByEvent(eventId);
   }
 
-  @Get('year/:year')
-  findByYear(@Param('year', ParseIntPipe) year: number) {
-    return this.combosService.findByYear(year);
+  @Get('event/:eventId/published')
+  findPublishedByEvent(@Param('eventId') eventId: string) {
+    return this.combosService.findPublishedByEvent(eventId);
   }
 
   @Get('price-range')
@@ -49,6 +49,11 @@ export class CombosController {
     @Query('max', ParseIntPipe) maxPrice: number,
   ) {
     return this.combosService.findByPriceRange(minPrice, maxPrice);
+  }
+
+  @Get(':id/current-price')
+  getCurrentPrice(@Param('id') id: string) {
+    return this.combosService.getCurrentPrice(id);
   }
 
   @Get(':id')

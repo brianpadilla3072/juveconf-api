@@ -1,9 +1,9 @@
 
-# Consagrados a Jesús API
+# JuveConf API
 
 ## Overview
 
-RESTful API backend for the Consagrados a Jesús event management system, built with NestJS and PostgreSQL. This API handles user authentication, event registration, payment processing through MercadoPago, and comprehensive order management.
+RESTful API backend for the JuveConf (Juventud en Conferencia) event management system, built with NestJS and PostgreSQL. This API handles user authentication, event registration, payment processing through MercadoPago, and comprehensive order management.
 
 ## Table of Contents
 

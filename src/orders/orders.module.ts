@@ -9,9 +9,10 @@ import { InviteesService } from 'src/invitees/invitees.service';
 import { UsersModule } from 'src/users/users.module';
 import { PasswordService } from 'src/global/password.service';
 import { MailModule } from 'src/mail/mail.module';
+import { EmailQueueModule } from 'src/email-queue/email-queue.module';
 
 @Module({
-  imports: [UsersModule, MailModule],
+  imports: [UsersModule, MailModule, EmailQueueModule],
   controllers: [OrdersController],
   providers: [
     OrdersService,

@@ -9,18 +9,61 @@ import { UpdateComboDto } from './DTOs/update-combo.dto';
 export class CombosService {
   constructor(private prisma: PrismaService) {}
 
+  // Método para obtener el precio actual de un combo (con preventa si aplica)
+  async getCurrentPrice(comboId: string) {
+    const now = new Date();
+
+    // Buscar preventa activa para este combo
+    const preSalePrice = await this.prisma.preSaleComboPrice.findFirst({
+      where: {
+        comboId,
+        preSale: {
+          isActive: true,
+          startDate: { lte: now },
+          endDate: { gte: now },
+          deletedAt: null
+        }
+      },
+      include: { preSale: true }
+    });
+
+    // Obtener el combo
+    const combo = await this.findOne(comboId);
+
+    if (preSalePrice) {
+      return {
+        price: preSalePrice.price,
+        preSaleName: preSalePrice.preSale.name,
+        preSaleId: preSalePrice.preSale.id,
+        isPreSale: true,
+        originalPrice: combo.price,
+        discount: combo.price - preSalePrice.price
+      };
+    }
+
+    // Si no hay preventa activa, retornar precio base
+    return {
+      price: combo.price,
+      preSaleName: null,
+      preSaleId: null,
+      isPreSale: false,
+      originalPrice: combo.price,
+      discount: 0
+    };
+  }
+
   async create(dto: CreateComboDto): Promise<Combo> {
-    // Verificar si ya existe un combo con el mismo nombre y año
+    // Verificar si ya existe un combo con el mismo nombre para el mismo evento
     const existingCombo = await this.prisma.combo.findFirst({
       where: {
         name: dto.name,
-        year: dto.year,
+        eventId: dto.eventId,
         deletedAt: null,
       },
     });
 
     if (existingCombo) {
-      throw new ConflictException(`Ya existe un combo con el nombre "${dto.name}" para el año ${dto.year}`);
+      throw new ConflictException(`Ya existe un combo con el nombre "${dto.name}" para este evento`);
     }
 
     // Verificar si el evento existe
@@ -32,18 +75,18 @@ export class CombosService {
       throw new NotFoundException('Evento no encontrado');
     }
 
-    return this.prisma.combo.create({ 
-      data: {
-        ...dto,
-        year: dto.year || new Date().getFullYear(),
-      },
+    return this.prisma.combo.create({
+      data: dto,
     });
   }
 
   async findAll(): Promise<Combo[]> {
+    const now = new Date();
+
     return this.prisma.combo.findMany({
       where: {
         deletedAt: null,
+        isActive: true,
       },
       include: {
         event: {
@@ -52,10 +95,23 @@ export class CombosService {
             topic: true,
             year: true,
           }
+        },
+        preSalePrices: {
+          where: {
+            preSale: {
+              isActive: true,
+              startDate: { lte: now },
+              endDate: { gte: now },
+              deletedAt: null
+            }
+          },
+          include: {
+            preSale: true
+          }
         }
       },
       orderBy: [
-        { year: 'desc' },
+        { displayOrder: 'asc' },
         { price: 'asc' },
       ],
     });
@@ -94,25 +150,25 @@ export class CombosService {
   async update(id: string, dto: UpdateComboDto): Promise<Combo> {
     // Verificar si el combo existe
     const existingCombo = await this.findOne(id);
-    
-    // Si se está actualizando el nombre o año, verificar duplicados
-    if (dto.name || dto.year) {
+
+    // Si se está actualizando el nombre o eventId, verificar duplicados
+    if (dto.name || dto.eventId) {
       const conflictCombo = await this.prisma.combo.findFirst({
         where: {
           name: dto.name || existingCombo.name,
-          year: dto.year || existingCombo.year,
+          eventId: dto.eventId || existingCombo.eventId,
           deletedAt: null,
           NOT: { id },
         },
       });
 
       if (conflictCombo) {
-        throw new ConflictException(`Ya existe otro combo con el nombre "${dto.name || existingCombo.name}" para el año ${dto.year || existingCombo.year}`);
+        throw new ConflictException(`Ya existe otro combo con el nombre "${dto.name || existingCombo.name}" para este evento`);
       }
     }
 
-    return this.prisma.combo.update({ 
-      where: { id }, 
+    return this.prisma.combo.update({
+      where: { id },
       data: {
         ...dto,
         updatedAt: new Date(),
@@ -127,9 +183,7 @@ export class CombosService {
     // Verificar si tiene órdenes asociadas
     const ordersCount = await this.prisma.order.count({
       where: {
-        combos: {
-          some: { id },
-        },
+        comboId: id,
       },
     });
 
@@ -168,10 +222,13 @@ export class CombosService {
     });
   }
 
-  async findByYear(year: number): Promise<Combo[]> {
+  async findPublishedByEvent(eventId: string): Promise<Combo[]> {
+    const now = new Date();
+
     return this.prisma.combo.findMany({
       where: {
-        year,
+        eventId,
+        isPublished: true,
         deletedAt: null,
       },
       include: {
@@ -181,9 +238,25 @@ export class CombosService {
             topic: true,
             year: true,
           }
+        },
+        preSalePrices: {
+          where: {
+            preSale: {
+              isActive: true,
+              deletedAt: null,
+              startDate: { lte: now },
+              endDate: { gte: now },
+            }
+          },
+          include: {
+            preSale: true,
+          },
+          orderBy: {
+            price: 'asc'
+          }
         }
       },
-      orderBy: { price: 'asc' },
+      orderBy: { displayOrder: 'asc' },
     });
   }
 
@@ -218,14 +291,6 @@ export class CombosService {
       _max: { price: true },
     });
 
-    const combosByYear = await this.prisma.combo.groupBy({
-      by: ['year'],
-      where: { deletedAt: null },
-      _count: { id: true },
-      _avg: { price: true },
-      orderBy: { year: 'desc' },
-    });
-
     const combosByEvent = await this.prisma.combo.groupBy({
       by: ['eventId'],
       where: { deletedAt: null },
@@ -250,7 +315,6 @@ export class CombosService {
 
     return {
       total: stats,
-      byYear: combosByYear,
       byEvent: combosByEventWithDetails,
     };
   }

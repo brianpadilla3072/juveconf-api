@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { PasswordService } from '../global/password.service';
 import { PrismaService } from 'prisma/prisma.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { EmailQueueModule } from '../email-queue/email-queue.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
         signOptions: { expiresIn: '60m' },
       }),
     }),
+    EmailQueueModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, PasswordService, PrismaService, JwtStrategy],

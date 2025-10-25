@@ -24,6 +24,7 @@ enum OrderStatus {
   PENDING
   REVIEW
   PAID
+  CANCELLED
 }
 
 enum PaymentType {
@@ -35,6 +36,20 @@ enum PaymentType {
 enum AuthProvider {
   LOCAL
   AUTH0
+}
+
+enum EmailType {
+  ORDEN_TRANSFER
+  ORDEN_CASH
+  TICKET_DOWNLOAD
+  PASSWORD_RESET
+  CUSTOM
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
 }
 
 // Modelos principales
@@ -53,6 +68,7 @@ model User {
   locale          String?
   password        String?      // Opcional si el usuario se registra vía Auth0
   role            UserRole     @default(USER)
+  requirePasswordChange Boolean  @default(false)  // Fuerza al usuario a cambiar su contraseña temporal
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -61,6 +77,10 @@ model User {
 
   orders          Order[]
   payments        Payment[]
+
+  @@index([email, deletedAt])
+  @@index([dni])
+  @@index([role])
 }
 
 model Event {
@@ -70,21 +90,44 @@ model Event {
   capacity        Int
   salesStartDate  DateTime
 
+  // Nuevos campos opcionales
+  salesEndDate    DateTime?
+  location        String?
+  description     String?
+  isActive        Boolean      @default(true)
+
+  // Fechas del evento (NO de ventas)
+  eventStartDate  DateTime?    // Fecha de inicio del evento
+  eventEndDate    DateTime?    // Fecha de fin del evento
+  eventDays       Json?        // Array calculado automáticamente de días: { days: [...], totalDays: N }
+
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   deletedAt       DateTime?
 
   preSales        PreSale[]
   orders          Order[]
-  combos          Combo[]      // Relación inversa agregada
+  combos          Combo[]
+
+  @@index([year])
+  @@index([salesStartDate])
+  @@index([eventStartDate])
 }
 
 model Combo {
   id              String       @id @default(uuid())
   name            String
-  price           Float
-  year            Int
-  minPersons      Int
+  price           Float        // Precio base
+  personsIncluded Int          // Cantidad de personas que incluye el combo
+
+  // Campos opcionales
+  maxPersons      Int?
+  isActive        Boolean      @default(true)
+  isPublished     Boolean      @default(false)  // Indica si el combo está publicado para el público
+  isFree          Boolean      @default(false)  // Indica si el combo es gratuito
+  description     String?
+  displayOrder    Int          @default(0)
+  metadata        Json?        // Datos flexibles como JSON
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -94,23 +137,53 @@ model Combo {
   event           Event        @relation(fields: [eventId], references: [id])
 
   orders          Order[]
+  preSalePrices   PreSaleComboPrice[]
 
-  @@unique([name, year]) // Evita duplicar combos con el mismo nombre en el mismo año
+  @@unique([eventId, name])
+  @@index([eventId, isActive])
 }
 
+// Rediseño completo de PreSale
 model PreSale {
   id              String       @id @default(uuid())
   eventId         String
   event           Event        @relation(fields: [eventId], references: [id])
 
-  discountPercent Float
+  name            String       // "Preventa Mayo-Junio"
+  description     String?
+
   startDate       DateTime
-  ticketQuantity  Int
-  year            Int
+  endDate         DateTime
+  isActive        Boolean      @default(true)
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   deletedAt       DateTime?
+
+  comboPrices     PreSaleComboPrice[]
+
+  @@unique([eventId, name])
+  @@index([eventId, startDate, endDate])
+}
+
+// Nueva tabla intermedia: PreSale ↔ Combo con precio específico
+model PreSaleComboPrice {
+  id              String       @id @default(uuid())
+
+  preSaleId       String
+  preSale         PreSale      @relation(fields: [preSaleId], references: [id], onDelete: Cascade)
+
+  comboId         String
+  combo           Combo        @relation(fields: [comboId], references: [id])
+
+  price           Float        // Precio específico para esta preventa
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([preSaleId, comboId])
+  @@index([preSaleId])
+  @@index([comboId])
 }
 
 model Order {
@@ -120,13 +193,21 @@ model Order {
   user              User?        @relation(fields: [userId], references: [id])
   eventId           String
   event             Event        @relation(fields: [eventId], references: [id])
-  combos            Combo[]      // Relación many-to-many implícita
+
+  // Relación one-to-one con Combo (cada orden tiene 1 combo)
+  comboId           String
+  combo             Combo        @relation(fields: [comboId], references: [id])
+
   total             Float
-  status            OrderStatus       @default(PENDING)
+  status            OrderStatus  @default(PENDING)
   paymentType       PaymentType
-  externalReference String? @unique
+  externalReference String?      @unique
   metadataToken     String?
   preferenceId      String?
+
+  // Nuevo campo: Snapshot del estado al momento de compra
+  orderSnapshot     Json?
+
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   deletedAt         DateTime?
@@ -135,6 +216,15 @@ model Order {
   phone             String?
   payments          Payment[]
   invitees          Invitee[]
+  emailQueue        EmailQueue[]
+
+  @@index([userId])
+  @@index([eventId])
+  @@index([comboId])
+  @@index([status, paymentType])
+  @@index([email])
+  @@index([cuil])
+  @@index([createdAt])
 }
 
 model Payment {
@@ -161,23 +251,40 @@ model Payment {
   deletedAt         DateTime?
 
   invitees          Invitee[]
+  emailQueue        EmailQueue[]
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
 }
 
 model Invitee {
   id              String        @id @default(uuid())
   name            String
-  cuil             String
+  cuil            String
   email           String?
   phone           String?
   orderId         String?
   order           Order?        @relation(fields: [orderId], references: [id])
   paymentId       String?
   payment         Payment?      @relation(fields: [paymentId], references: [id])
-  attendedDay1    Boolean    @default(false)
-  attendedDay2    Boolean    @default(false)
+
+  // Sistema dinámico de asistencia por día
+  // Estructura: { days: { "1": { attended: true, timestamp: "..." }, "2": { attended: false }, ... } }
+  attendance      Json?
+
+  // Metadata adicional como JSON string: { email?, phone?, birthdate?, city?, church? }
+  metadata        String?
+
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?
+
+  @@index([orderId])
+  @@index([paymentId])
+  @@index([cuil])
+  @@index([email])
 }
 
 model Ingreso {
@@ -191,6 +298,8 @@ model Ingreso {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
+
+  @@index([year, fecha])
 }
 
 model Egreso {
@@ -204,4 +313,35 @@ model Egreso {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
+
+  @@index([year, fecha])
+}
+
+model EmailQueue {
+  id              String       @id @default(uuid())
+  to              String
+  subject         String
+  html            String?      @db.Text  // Optional for template-based emails
+
+  // Template fields
+  template        String?      // Template name for Handlebars
+  context         Json?        // Context variables for template
+
+  emailType       EmailType
+  orderId         String?
+  order           Order?       @relation(fields: [orderId], references: [id])
+  paymentId       String?
+  payment         Payment?     @relation(fields: [paymentId], references: [id])
+
+  status          EmailStatus  @default(PENDING)
+  attempts        Int          @default(0)
+  lastAttemptAt   DateTime?
+  sentAt          DateTime?
+  errorMessage    String?      @db.Text
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([status, attempts])
+  @@index([createdAt])
 }

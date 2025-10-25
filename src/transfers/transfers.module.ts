@@ -10,10 +10,11 @@ import { CombosService } from 'src/combos/combos.service';
 import { OrdersService } from 'src/orders/orders.service';
 import { MailModule } from 'src/mail/mail.module';
 import { MailService } from 'src/mail/mail.service';
+import { EmailQueueModule } from 'src/email-queue/email-queue.module';
 
 @Module({
-  imports: [HttpModule,MailModule],
+  imports: [HttpModule, MailModule, EmailQueueModule],
   controllers: [TransfersController],
-  providers: [TransfersService, MercadopagoService, PrismaService, JwtService,CombosService,OrdersService,MailService],
+  providers: [TransfersService, MercadopagoService, PrismaService, JwtService, CombosService, OrdersService, MailService],
 })
 export class TransfersModule {}

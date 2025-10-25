@@ -8,6 +8,8 @@ import { Controller, Post, Body, UsePipes, ValidationPipe, HttpException, HttpSt
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { IsArray, IsString, IsOptional, IsNotEmpty, IsObject } from 'class-validator';
 import { MailService } from './mail.service';
+import { EmailQueueService } from '../email-queue/email-queue.service';
+import { EmailType } from '@prisma/client';
 
 class SendEmailDto {
   @IsString()
@@ -55,7 +57,10 @@ class SendBulkEmailDto {
 export class MailController {
   private readonly logger = new Logger(MailController.name);
 
-  constructor(private readonly mailService: MailService) {}
+  constructor(
+    private readonly mailService: MailService,
+    private readonly emailQueueService: EmailQueueService,
+  ) {}
 
   @Post('send')
   @ApiOperation({ summary: 'Enviar correo con plantilla HTML' })
@@ -103,33 +108,33 @@ export class MailController {
   }
 
   @Post('send-bulk')
-  @ApiOperation({ summary: 'Enviar emails masivos con HTML personalizado' })
-  @ApiResponse({ status: 200, description: 'Emails enviados correctamente' })
+  @ApiOperation({ summary: 'Encolar emails masivos con HTML personalizado' })
+  @ApiResponse({ status: 200, description: 'Emails encolados correctamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
-  @ApiResponse({ status: 500, description: 'Error interno al enviar emails' })
+  @ApiResponse({ status: 500, description: 'Error interno al encolar emails' })
   @ApiBody({ type: SendBulkEmailDto })
   @UsePipes(new ValidationPipe({ transform: true }))
   async sendBulkEmail(@Body() dto: SendBulkEmailDto) {
     try {
-      this.logger.log(`Enviando email masivo a ${dto.recipients.length} destinatarios`);
+      this.logger.log(`Encolando email masivo a ${dto.recipients.length} destinatarios`);
 
-      const result = await this.mailService.sendBulkHtml(
+      const result = await this.emailQueueService.enqueueBulkEmails(
         dto.subject,
         dto.htmlContent,
         dto.recipients,
-        dto.from
+        EmailType.CUSTOM,
       );
 
       return {
         success: true,
-        totalSent: dto.recipients.length,
-        recipients: dto.recipients,
-        result
+        queued: result.queued,
+        recipients: result.recipients,
+        message: 'Emails encolados. Se procesarán en el próximo ciclo (cada hora)',
       };
     } catch (error) {
-      this.logger.error(`Error al enviar emails masivos: ${error.message}`);
+      this.logger.error(`Error al encolar emails masivos: ${error.message}`);
       throw new HttpException(
-        error.message || 'Error interno al enviar emails masivos',
+        error.message || 'Error interno al encolar emails masivos',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

@@ -5,7 +5,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  const app = await NestFactory.create(AppModule);
   
   // app.use(helmet());   
    app.useGlobalPipes(new ValidationPipe({
@@ -23,17 +23,17 @@ async function bootstrap() {
   }));
 
   app.enableCors({
-    origin: '*',
+    origin: ['http://localhost:4321', 'http://localhost:3000', 'http://localhost:3001'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: '*',
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     exposedHeaders: '*',
     credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 204
   });
   const config = new DocumentBuilder()
-    .setTitle('Consagrados a Jesus')
-    .setDescription('API consagrados a jesus')
+    .setTitle('JuveConf')
+    .setDescription('API para Juventud en Conferencia')
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);

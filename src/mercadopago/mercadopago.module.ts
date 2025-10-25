@@ -11,10 +11,11 @@ import { JwtModule } from "src/jwt/jwt.module";
 import { OrdersService } from 'src/orders/orders.service';
 import { MailModule } from 'src/mail/mail.module';
 import { MailService } from 'src/mail/mail.service';
+import { EmailQueueModule } from 'src/email-queue/email-queue.module';
 
 @Module({
-  imports: [HttpModule, PrismaModule, JwtModule, MailModule],
-  providers: [MpSignatureService, MercadopagoService, CombosService,OrdersService,MailService],
+  imports: [HttpModule, PrismaModule, JwtModule, MailModule, EmailQueueModule],
+  providers: [MpSignatureService, MercadopagoService, CombosService, OrdersService, MailService],
   controllers: [MercadopagoController],
 })
 export class MercadopagoModule{}

@@ -16,6 +16,10 @@ export class CreateInviteeDto {
   phone?: string;
 
   @IsOptional()
+  @IsString()
+  metadata?: string; // JSON string con metadata adicional (birthdate, city, church, etc)
+
+  @IsOptional()
   @IsUUID()
   orderId?: string;
 

@@ -261,7 +261,7 @@ export class PaymentsService {
                 year: true,
               }
             },
-            combos: {
+            combo: {
               select: {
                 id: true,
                 name: true,

@@ -1,9 +1,11 @@
 // src/invitees/invitees.service.ts
 /* eslint-disable prettier/prettier */
- 
-import { Injectable, NotFoundException } from '@nestjs/common';
+
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { FilterInviteesDto, CreateInviteeDto, UpdateInviteeDto } from './DTOs';
+import { AttendanceSchema } from './schemas/attendance.schema';
+import { ZodError } from 'zod';
 
 @Injectable()
 export class InviteesService {
@@ -75,21 +77,52 @@ export class InviteesService {
       data: { deletedAt: new Date() },
     });
   }
-  async markAttendance(id: string, data: { day1?: boolean; day2?: boolean }) {
-  const invitee = await this.prisma.invitee.findUnique({ where: { id } });
+  /**
+   * Marca asistencia de un invitado para un día específico (sistema dinámico)
+   * @param id - ID del invitado
+   * @param data - { dayNumber: number, attended: boolean, notes?: string }
+   */
+  async markAttendanceByDay(
+    id: string,
+    data: { dayNumber: number; attended: boolean; notes?: string }
+  ) {
+    const invitee = await this.prisma.invitee.findUnique({ where: { id } });
 
-  if (!invitee || invitee.deletedAt) {
-    throw new NotFoundException('Invitee not found or deleted');
+    if (!invitee || invitee.deletedAt) {
+      throw new NotFoundException('Invitee not found or deleted');
+    }
+
+    // Obtener attendance actual o crear estructura nueva
+    const currentAttendance = (invitee.attendance as any) || { days: {} };
+
+    // Actualizar el día específico
+    currentAttendance.days[data.dayNumber.toString()] = {
+      attended: data.attended,
+      timestamp: new Date().toISOString(),
+      ...(data.notes && { notes: data.notes })
+    };
+
+    // Validar con Zod antes de guardar
+    try {
+      AttendanceSchema.parse(currentAttendance);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException({
+          message: 'Invalid attendance data structure',
+          errors: error.issues
+        });
+      }
+      throw error;
+    }
+
+    // Actualizar con el nuevo sistema de asistencia
+    return this.prisma.invitee.update({
+      where: { id },
+      data: {
+        attendance: currentAttendance
+      },
+    });
   }
-
-  return this.prisma.invitee.update({
-    where: { id },
-    data: {
-      attendedDay1: data.day1 ?? invitee.attendedDay1,
-      attendedDay2: data.day2 ?? invitee.attendedDay2,
-    },
-  });
-}
 
 async getInviteesEmails(filter: FilterInviteesDto) {
   const year = filter.year ?? new Date().getFullYear();

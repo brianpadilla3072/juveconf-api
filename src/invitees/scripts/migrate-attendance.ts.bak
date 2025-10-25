@@ -1,0 +1,140 @@
+/* eslint-disable prettier/prettier */
+/**
+ * SCRIPT DE MIGRACIÓN: attendedDay1/Day2 -> attendance (JSON)
+ *
+ * Este script migra los datos de asistencia desde las columnas
+ * attendedDay1 y attendedDay2 al nuevo campo JSON 'attendance'.
+ *
+ * IMPORTANTE: Ejecutar ANTES de eliminar las columnas viejas del schema.
+ *
+ * Uso:
+ * npx ts-node src/invitees/scripts/migrate-attendance.ts
+ */
+
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+interface Attendance {
+  days: {
+    [dayNumber: string]: {
+      attended: boolean;
+      timestamp: string;
+      notes?: string;
+    };
+  };
+}
+
+async function migrateAttendance() {
+  console.log('🚀 Iniciando migración de asistencias...\n');
+
+  try {
+    // 1. Obtener todos los invitados que no están eliminados
+    const invitees = await prisma.invitee.findMany({
+      where: {
+        deletedAt: null
+      },
+      select: {
+        id: true,
+        name: true,
+        attendedDay1: true,
+        attendedDay2: true,
+        attendance: true
+      }
+    });
+
+    console.log(`📊 Total de invitados a migrar: ${invitees.length}\n`);
+
+    let migratedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+
+    // 2. Procesar cada invitado
+    for (const invitee of invitees) {
+      try {
+        // Verificar si ya tiene datos en attendance JSON
+        const currentAttendance = invitee.attendance as any;
+
+        // Si ya tiene attendance con días, verificar si necesita actualización
+        if (currentAttendance && currentAttendance.days && Object.keys(currentAttendance.days).length > 0) {
+          console.log(`⏭️  Saltando ${invitee.name} - Ya tiene datos en attendance JSON`);
+          skippedCount++;
+          continue;
+        }
+
+        // Construir nuevo objeto de asistencia basado en los campos viejos
+        const newAttendance: Attendance = {
+          days: {}
+        };
+
+        // Migrar day1 si está marcado
+        if (invitee.attendedDay1) {
+          newAttendance.days['1'] = {
+            attended: true,
+            timestamp: new Date().toISOString(),
+            notes: 'Migrado desde attendedDay1'
+          };
+        }
+
+        // Migrar day2 si está marcado
+        if (invitee.attendedDay2) {
+          newAttendance.days['2'] = {
+            attended: true,
+            timestamp: new Date().toISOString(),
+            notes: 'Migrado desde attendedDay2'
+          };
+        }
+
+        // Solo actualizar si hay al menos un día marcado
+        if (Object.keys(newAttendance.days).length > 0) {
+          await prisma.invitee.update({
+            where: { id: invitee.id },
+            data: {
+              attendance: newAttendance as any
+            }
+          });
+
+          console.log(`✅ Migrado: ${invitee.name} (Day1: ${invitee.attendedDay1}, Day2: ${invitee.attendedDay2})`);
+          migratedCount++;
+        } else {
+          console.log(`⚪ Sin asistencias: ${invitee.name}`);
+          skippedCount++;
+        }
+
+      } catch (error) {
+        console.error(`❌ Error migrando ${invitee.name}:`, error);
+        errorCount++;
+      }
+    }
+
+    // 3. Resumen final
+    console.log('\n' + '='.repeat(60));
+    console.log('📈 RESUMEN DE MIGRACIÓN');
+    console.log('='.repeat(60));
+    console.log(`✅ Migrados exitosamente: ${migratedCount}`);
+    console.log(`⏭️  Saltados (ya tenían datos): ${skippedCount}`);
+    console.log(`❌ Errores: ${errorCount}`);
+    console.log(`📊 Total procesados: ${invitees.length}`);
+    console.log('='.repeat(60) + '\n');
+
+    if (errorCount === 0) {
+      console.log('🎉 Migración completada exitosamente!\n');
+      console.log('⚠️  SIGUIENTE PASO: Verificar los datos migrados antes de eliminar las columnas viejas.\n');
+    } else {
+      console.log('⚠️  Hubo errores durante la migración. Revisar antes de continuar.\n');
+    }
+
+  } catch (error) {
+    console.error('💥 Error fatal en la migración:', error);
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// Ejecutar migración
+migrateAttendance()
+  .catch((error) => {
+    console.error('Error ejecutando migración:', error);
+    process.exit(1);
+  });

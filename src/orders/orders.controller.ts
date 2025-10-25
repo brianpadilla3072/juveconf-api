@@ -20,8 +20,8 @@ export class OrdersController {
     constructor(private readonly ordersService: OrdersService) {}
 
     @Get('review')
-    // @UseGuards(JwtAuthGuard)
-    // @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
+    @UseGuards(JwtAuthGuard)
+    @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
     getOrdersByReview() {
         return this.ordersService.getOrdersByStatus(OrderStatus.REVIEW);
     }

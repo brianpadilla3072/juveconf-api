@@ -1,22 +1,21 @@
 /* eslint-disable no-useless-catch */
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
- 
+
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { Injectable, Logger } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
-import { UserCreatedTemplate, PaymentReceivedTemplate, TicketDetailsTemplate, ResetPasswordTemplate } from './templates'; // Importar las plantillas
-import { EmailTemplate } from './templates';
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly defaultFrom = '"Consagrados a Jesús" <equipo@consagradosajesus.com>';
+  private readonly defaultFrom = '"JUVECONF" <equipo@juveconfe.com>';
 
   constructor(private readonly mailer: MailerService) {}
 
   /**
-   * Envía un correo electrónico usando una plantilla
+   * Envía un correo electrónico usando una plantilla Handlebars
    */
   async sendTemplate(
     templateName: string,
@@ -26,15 +25,12 @@ export class MailService {
     attachments?: any[],
   ) {
     try {
-      // Instanciar la plantilla correspondiente
-      const template = this.getTemplate(templateName);
-      const html = template.render(context);
-
       const result = await this.mailer.sendMail({
         from: this.defaultFrom,
         to,
         subject: subject || this.resolveSubject(templateName),
-        html,
+        template: templateName, // Handlebars template name
+        context, // Variables for the template
         attachments,
       });
 
@@ -128,49 +124,29 @@ export class MailService {
     }
   }
   /**
-   * Obtiene la plantilla según el nombre
-   */
-  private getTemplate(templateName: string): EmailTemplate {
-    const templates: Record<string, EmailTemplate> = {
-      userCreated: new UserCreatedTemplate(),
-      paymentReceived: new PaymentReceivedTemplate(),
-      ticketDetails: new TicketDetailsTemplate(),
-      resetPassword: new ResetPasswordTemplate(),
-   
-    };
-
-    const template = templates[templateName];
-    if (!template) {
-      throw new Error(`Plantilla no encontrada: ${templateName}`);
-    }
-    return template;
-  }
-
-  /**
    * Resuelve el asunto del correo según la plantilla
    */
   private resolveSubject(templateName: string): string {
     const subjects = {
-      userCreated: 'Usuario Creado con Éxito',
-      paymentReceived: 'Su Pago Ha Sido Procesado',
-      ticketDetails: 'Detalles de Su Ticket',
-      resetPassword: 'Recuperación de Contraseña',
-      welcomeMessage: 'Bienvenido a Consagrados a Jesús',
-      eventConfirmation: 'Confirmación de Evento',
+      'user-created': 'Bienvenido a JUVECONF 2025',
+      'payment-received': 'Pago Recibido - JUVECONF 2025',
+      'ticket-details': 'Tu entrada - JUVECONF 2025',
+      'reset-password': 'Contraseña Temporal - JUVECONF 2025',
+      'order-pending': 'Orden Creada - JUVECONF 2025',
     };
-    return subjects[templateName] || 'Notificación Consagrados a Jesús';
+    return subjects[templateName] || 'Notificación JUVECONF';
   }
+
   /**
- * Devuelve los nombres de plantillas disponibles
- */
-public getTemplateNames(): string[] {
-  return [
-    'userCreated',
-    'paymentReceived',
-    'ticketDetails',
-    'resetPassword',
-    'welcomeMessage',
-    'eventConfirmation',
-  ];
-}
+   * Devuelve los nombres de plantillas disponibles
+   */
+  public getTemplateNames(): string[] {
+    return [
+      'user-created',
+      'payment-received',
+      'ticket-details',
+      'reset-password',
+      'order-pending',
+    ];
+  }
 }

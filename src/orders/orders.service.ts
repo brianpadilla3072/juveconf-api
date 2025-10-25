@@ -3,17 +3,19 @@
  
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
  
-import { 
-  BadRequestException, 
+import {
+  BadRequestException,
   Injectable,
-  InternalServerErrorException, 
-  Logger, 
-  NotFoundException 
+  InternalServerErrorException,
+  Logger,
+  NotFoundException
 } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { Order, PaymentType, OrderStatus } from '@prisma/client';
+import { Order, PaymentType, OrderStatus, EmailType } from '@prisma/client';
 import { JwtService } from 'src/jwt/jwt.service';
 import { MailService } from 'src/mail/mail.service';
+import { APP_CONFIG, COLORS } from 'src/constants/app.constants';
+import { EmailQueueService } from 'src/email-queue/email-queue.service';
 
 @Injectable()
 export class OrdersService {
@@ -22,7 +24,8 @@ export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-    private mailService: MailService
+    private mailService: MailService,
+    private emailQueueService: EmailQueueService
   ) {}
   async createOrder(data: {
     id: string
@@ -56,6 +59,7 @@ export class OrdersService {
         id,
         userId: userId ?? null,
         eventId: combo.eventId,
+        comboId, // Relación directa one-to-one
         year,
         total,
         status: OrderStatus.PENDING,
@@ -64,9 +68,6 @@ export class OrdersService {
         email,
         cuil,
         phone,
-        combos: {
-          connect: [{ id: comboId }],
-        },
       },
     });
   }
@@ -78,7 +79,7 @@ export class OrdersService {
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { combos: true },
+      include: { combo: true },
     });
 
     if (!order) {
@@ -93,17 +94,14 @@ export class OrdersService {
       throw new BadRequestException('El combo no existe');
     }
 
-    const total = combo.price * combo.minPersons;
+    const total = combo.price * combo.personsIncluded;
 
     return this.prisma.order.update({
       where: { id: orderId },
       data: {
         total,
         paymentType,
-        combos: {
-          set: [],
-          connect: { id: comboId },
-        },
+        comboId, // Relación directa
       },
     });
   }
@@ -142,14 +140,14 @@ export class OrdersService {
   }
   async getOrdersByStatus(status: OrderStatus) {
     const orders = await this.prisma.order.findMany({
-      where: { 
+      where: {
         status,
         deletedAt: null
       },
       include: {
         user: true,
         event: true,
-        combos: true,
+        combo: true, // Relación one-to-one
         payments: true,
         invitees: true
       },
@@ -178,8 +176,7 @@ export class OrdersService {
               cuil: attendee.cuil,
               orderId: order.id,
               paymentId: null,
-              attendedDay1: false,
-              attendedDay2: false,
+              attendance: null,
               createdAt: order.createdAt,
               updatedAt: order.updatedAt,
               deletedAt: null,
@@ -231,9 +228,7 @@ export class OrdersService {
   }
 
   async approveOrder(orderId: string): Promise<{success: boolean, data: Order}> {
-    
-    let emailData: any; // Variable para almacenar datos del email
-    
+
     const result = await this.prisma.$transaction(async (tx) => {
       // 1. Actualizar el estado de la orden
       const order = await tx.order.update({
@@ -270,100 +265,60 @@ export class OrdersService {
       // 4. Crear invitados si existen
       if (metadataPayload.attendees?.length) {
         await Promise.all(
-          metadataPayload.attendees.map(attendee => 
-            tx.invitee.create({
+          metadataPayload.attendees.map(attendee => {
+            // Parsear metadata si existe
+            let parsedMetadata: any = {};
+            if (attendee.metadata) {
+              try {
+                parsedMetadata = JSON.parse(attendee.metadata);
+              } catch (error) {
+                this.logger.warn(`Error parsing metadata for attendee ${attendee.name}: ${error.message}`);
+              }
+            }
+
+            return tx.invitee.create({
               data: {
                 name: attendee.name,
                 cuil: attendee.cuil,
+                email: parsedMetadata.email || undefined,
+                phone: parsedMetadata.phone || undefined,
+                metadata: attendee.metadata || undefined, // Guardar metadata completa como JSON string
                 orderId: order.id,
                 paymentId: payment.id,
               }
-            })
-          )
+            });
+          })
         );
       }
-      
-      // 5. Preparar datos del email (NO enviarlo dentro de la transacción)
-      const template = `<!DOCTYPE html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Descargar Entrada</title>
-  </head>
-  <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; padding: 20px 0;">
-      <tr>
-        <td align="center">
-          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; padding: 30px; box-shadow: 0 0 5px rgba(0,0,0,0.1);">
-            <tr>
-              <td align="center" style="padding-bottom: 20px;">
-                <h1 style="color: #2c3e50; margin: 0;">¡Gracias por tu compra!</h1>
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style="padding: 10px 0;">
-                <p style="font-size: 16px; color: #333333; margin: 0;">El ID de tu Compra es:</p>
-                <p style="font-size: 16px; font-weight: bold; color: #f76f1f; word-break: break-word; margin: 5px 0 20px;">${payment.id}</p>
-              </td>
-            </tr>
-            <tr>
-              <td align="center">
-                <p style="font-size: 16px; color: #333333; margin: 0 0 20px;">Hacé clic en el botón para ir a la página donde podés descargar tu entrada:</p>
-                <a href="https://consagradosajesus.com/descargar-entrada/${payment.id}"
-                  style="background-color: #f76f1f; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 5px; display: inline-block; font-size: 16px; margin-top: 10px;">
-                  Ir a la página de descarga
-                </a>
-                <p style="font-size: 14px; color: #555555; margin-top: 20px;">
-                  O hacé clic en este enlace si el botón no funciona:<br />
-                  <a href="https://consagradosajesus.com/descargar-entrada/${payment.id}"
-                    style="color: #2980b9; text-decoration: underline;">https://consagradosajesus.com/descargar-entrada/${payment.id}</a>
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style="padding-top: 30px;">
-                <p style="font-size: 12px; color: #999999;">Este mensaje fue generado automáticamente. Por favor no respondas este correo.</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
 
-      `;
-      
-      emailData = {
-        to: order.email,
-        html: template,
-        subject: `YA PODES DESCARGAR TUS ENTRADAS: ${payment.id}`
-      };
-      
+      // 5. Enqueue email usando template de Handlebars
+      try {
+        await this.emailQueueService.enqueueTemplateEmail({
+          to: order.email,
+          subject: 'Tu entrada - JUVECONF 2025',
+          template: 'ticket-details',
+          context: {
+            userName: order.email.split('@')[0], // Use email username as fallback
+            paymentId: payment.id,
+            ticketUrl: `${APP_CONFIG.url}/descargar-entrada/${payment.id}`,
+          },
+          emailType: EmailType.TICKET_DOWNLOAD,
+          orderId: order.id,
+          paymentId: payment.id,
+        });
+        this.logger.log(`Email encolado exitosamente para ${order.email}`);
+      } catch (error: any) {
+        this.logger.error(`Error al encolar email: ${error.message}`);
+        // El email falló, pero la orden ya está aprobada
+      }
+
       return { success: true, data: order };
     }, {
       maxWait: 5000,
       timeout: 10000,
       isolationLevel: 'Serializable'
     });
-    
-    // 6. Enviar email FUERA de la transacción
-    if (emailData) {
-      try {
-        // Timeout de 5 segundos para evitar que se cuelgue
-        const emailPromise = this.mailService.sendCustomEmail(emailData.to, emailData.html, emailData.subject);
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Email timeout')), 5000)
-        );
-        
-        await Promise.race([emailPromise, timeoutPromise]);
-        this.logger.log(`Email enviado exitosamente a ${emailData.to}`);
-      } catch (error) {
-        this.logger.error(`Error al enviar email: ${error.message}`);
-        // El email falló, pero la orden ya está aprobada
-      }
-    }
-    
+
     return result;
   }
 

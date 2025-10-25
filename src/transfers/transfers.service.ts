@@ -4,7 +4,7 @@
  
  
 import { Injectable, Logger } from '@nestjs/common';
-import { Order, PaymentType } from '@prisma/client';
+import { Order, PaymentType, EmailType } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
 import { CustomError } from 'src/global/CustomError';
 import { JwtService } from 'src/jwt/jwt.service';
@@ -12,6 +12,10 @@ import { CreatePreferenceDto } from 'src/mercadopago/DTOs/create-preference.dto'
 import { MercadopagoService } from 'src/mercadopago/mercadopago.service';
 import { OrdersService, OrderStatus } from 'src/orders/orders.service';
 import { MailService } from 'src/mail/mail.service';
+import { CombosService } from 'src/combos/combos.service';
+import { APP_CONFIG, COLORS } from 'src/constants/app.constants';
+import { EmailQueueService } from 'src/email-queue/email-queue.service';
+
 @Injectable()
 export class TransfersService {
   private readonly logger = new Logger(TransfersService.name);
@@ -21,7 +25,9 @@ export class TransfersService {
     private readonly ordersService: OrdersService,
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly mailService: MailService
+    private readonly mailService: MailService,
+    private readonly combosService: CombosService,
+    private readonly emailQueueService: EmailQueueService
   ) { }
 
 
@@ -97,8 +103,29 @@ export class TransfersService {
     let createdOrder: Order | null = null;    // 3) Crear orden dentro de transacción
     try {
       await this.prisma.$transaction(async (tx) => {
-        const totalAmount = combo.price ;
+        // Get current price with presales
+        const currentPrice = await this.combosService.getCurrentPrice(combo.id);
+        const totalAmount = currentPrice.price * dto.quantity;
         console.log('[createTransferOrder] Total calculado:', totalAmount);
+
+        // Create order snapshot
+        const orderSnapshot = {
+          combo: {
+            id: combo.id,
+            name: combo.name,
+            basePrice: combo.price,
+            appliedPrice: currentPrice.price,
+            personsIncluded: combo.personsIncluded,
+            description: combo.description,
+          },
+          preSale: currentPrice.isPreSale ? {
+            id: currentPrice.preSaleId,
+            name: currentPrice.preSaleName,
+            discount: currentPrice.discount,
+          } : null,
+          timestamp: new Date().toISOString(),
+          quantity: dto.quantity,
+        };
 
         const order = await tx.order.create({
           data: {
@@ -111,7 +138,8 @@ export class TransfersService {
             cuil: dto.cuil,
             phone: dto.phone,
             paymentType: PaymentType.TRANSFER,
-            combos: { connect: [{ id: combo.id }] },
+            comboId: combo.id, // Relación directa one-to-one
+            orderSnapshot, // Save snapshot
           },
         });
         console.log('[createTransferOrder] Orden creada:', order.id);
@@ -146,57 +174,20 @@ export class TransfersService {
       if (error instanceof CustomError) throw error;
       throw new CustomError(500, 'Error inesperado', 'Hubo un error al crear la orden de transferencia.');
     }
-    // 4) Enviar confirmacion
-    const template = `<!DOCTYPE html>
-        <html lang="es">
-          <head>
-            <meta charset="UTF-8" />
-            <title>Confirmar Transferencia</title>
-          </head>
-          <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; padding: 20px 0;">
-              <tr>
-                <td align="center">
-                  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; padding: 30px; box-shadow: 0 0 5px rgba(0,0,0,0.1);">
-                    <tr>
-                      <td align="center" style="padding-bottom: 20px;">
-                        <h1 style="color: #2c3e50; margin: 0;">¡Gracias por tu compra!</h1>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td align="center" style="padding: 10px 0;">
-                        <p style="font-size: 16px; color: #333333; margin: 0;">El ID de tu orden es:</p>
-                        <p style="font-size: 16px; font-weight: bold; color: #f76f1f; word-break: break-word; margin: 5px 0 20px;">${createdOrder!.id}</p>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td align="center">
-                        <p style="font-size: 16px; color: #333333; margin: 0 0 20px;">Dale clic al botón para continuar con la verificación:</p>
-                        <a href="https://consagradosajesus.com/verificar-tranferencia/${createdOrder!.id}"
-                          style="background-color: #f76f1f; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 5px; display: inline-block; font-size: 16px; margin-top: 10px;">
-                          Confirmar Transferencia
-                        </a>
-                        <p style="font-size: 14px; color: #555555; margin-top: 20px;">
-                          O hacé clic en este enlace si el botón no funciona:<br />
-                          <a href="https://consagradosajesus.com/verificar-tranferencia/${createdOrder!.id}"
-                            style="color: #2980b9; text-decoration: underline;">https://consagradosajesus.com/verificar-tranferencia/${createdOrder!.id}</a>
-                        </p>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td align="center" style="padding-top: 30px;">
-                        <p style="font-size: 12px; color: #999999;">Este mensaje fue generado automáticamente. Por favor no respondas este correo.</p>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </body>
-        </html>
-        `
-      await this.mailService.sendCustomEmail(email,template,`INICIAR VERIFICACION DE ORDEN: ${createdOrder!.id} `)
-    console.log('[createTransferOrder] Orden de transferencia creada con éxito.');
+    // 4) Enviar confirmacion usando template de Handlebars
+    await this.emailQueueService.enqueueTemplateEmail({
+      to: email,
+      subject: 'Orden Creada - JUVECONF 2025',
+      template: 'order-pending',
+      context: {
+        userName: email.split('@')[0],
+        orderId: createdOrder!.id,
+      },
+      emailType: EmailType.ORDEN_TRANSFER,
+      orderId: createdOrder!.id,
+    });
+
+    console.log('[createTransferOrder] Orden de transferencia creada con éxito. Email encolado.');
     return { success: true, orderID: createdOrder!.id };
   }
 
@@ -254,14 +245,35 @@ export class TransfersService {
     }
 
     let email: string = "";
-    let createdOrder: Order | null = null;    
+    let createdOrder: Order | null = null;
     let verificationLink: string = "";
 
     // 3) Crear orden dentro de transacción
     try {
       await this.prisma.$transaction(async (tx) => {
-        const totalAmount = combo.price;
+        // Get current price with presales
+        const currentPrice = await this.combosService.getCurrentPrice(combo.id);
+        const totalAmount = currentPrice.price * dto.quantity;
         console.log('[createCashOrder] Total calculado:', totalAmount);
+
+        // Create order snapshot
+        const orderSnapshot = {
+          combo: {
+            id: combo.id,
+            name: combo.name,
+            basePrice: combo.price,
+            appliedPrice: currentPrice.price,
+            personsIncluded: combo.personsIncluded,
+            description: combo.description,
+          },
+          preSale: currentPrice.isPreSale ? {
+            id: currentPrice.preSaleId,
+            name: currentPrice.preSaleName,
+            discount: currentPrice.discount,
+          } : null,
+          timestamp: new Date().toISOString(),
+          quantity: dto.quantity,
+        };
 
         const order = await tx.order.create({
           data: {
@@ -274,7 +286,8 @@ export class TransfersService {
             cuil: dto.cuil,
             phone: dto.phone,
             paymentType: PaymentType.CASH,
-            combos: { connect: [{ id: combo.id }] },
+            comboId: combo.id, // Relación directa one-to-one
+            orderSnapshot, // Save snapshot
           },
         });
         console.log('[createCashOrder] Orden creada:', order.id);
@@ -293,7 +306,7 @@ export class TransfersService {
           attendees: dto.attendees,
         };
         email = metadataPayload.email;
-        verificationLink = `https://consagradosajesus.com/verificar-tranferencia/${order.id}`;
+        verificationLink = `${APP_CONFIG.url}/verificar-tranferencia/${order.id}`;
 
         const metadataToken = this.jwtService.signMetadata(metadataPayload);
         console.log('[createCashOrder] Metadata token generado.');
@@ -311,77 +324,27 @@ export class TransfersService {
       throw new CustomError(500, 'Error inesperado', 'Hubo un error al crear la orden de pago en efectivo.');
     }
 
-    // 4) Enviar confirmacion por email
-    const template = `<!DOCTYPE html>
-        <html lang="es">
-          <head>
-            <meta charset="UTF-8" />
-            <title>Confirmar Pago en Efectivo</title>
-          </head>
-          <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; padding: 20px 0;">
-              <tr>
-                <td align="center">
-                  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; padding: 30px; box-shadow: 0 0 5px rgba(0,0,0,0.1);">
-                    <tr>
-                      <td align="center" style="padding-bottom: 20px;">
-                        <h1 style="color: #2c3e50; margin: 0;">¡Tu orden está en progreso!</h1>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td align="center" style="padding: 10px 0;">
-                        <p style="font-size: 16px; color: #333333; margin: 0;">Tu orden de pago en efectivo ha sido creada exitosamente.</p>
-                        <p style="font-size: 16px; color: #333333; margin: 5px 0;">El ID de tu orden es:</p>
-                        <p style="font-size: 16px; font-weight: bold; color: #f76f1f; word-break: break-word; margin: 5px 0 20px;">${createdOrder!.id}</p>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td align="center" style="padding: 10px 0;">
-                        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 10px 0;">
-                          <p style="font-size: 14px; color: #856404; margin: 0; font-weight: bold;">
-                            💰 Instrucciones de Pago en Efectivo:
-                          </p>
-                          <p style="font-size: 14px; color: #856404; margin: 10px 0 0 0;">
-                            • Acércate al punto de venta autorizado<br/>
-                            • Presenta tu DNI y el ID de orden<br/>
-                            • Realiza el pago por $${combo.price} ARS<br/>
-                            • Guarda el comprobante de pago
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td align="center">
-                        <p style="font-size: 16px; color: #333333; margin: 0 0 20px;">Una vez realizado el pago, podrás confirmar tu compra desde el siguiente enlace:</p>
-                        <a href="${verificationLink}"
-                          style="background-color: #27ae60; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 5px; display: inline-block; font-size: 16px; margin-top: 10px;">
-                          Confirmar Pago en Efectivo
-                        </a>
-                        <p style="font-size: 14px; color: #555555; margin-top: 20px;">
-                          También puedes acceder desde este enlace:<br />
-                          <a href="${verificationLink}"
-                            style="color: #2980b9; text-decoration: underline;">${verificationLink}</a>
-                        </p>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td align="center" style="padding-top: 30px;">
-                        <p style="font-size: 12px; color: #999999;">Este mensaje fue generado automáticamente. Por favor no respondas este correo.</p>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </body>
-        </html>
-        `;
-        
-    await this.mailService.sendCustomEmail(email, template, `ORDEN DE PAGO EN EFECTIVO CREADA: ${createdOrder!.id}`);
-    console.log('[createCashOrder] Orden de pago en efectivo creada con éxito.');
-    
-    return { 
-      success: true, 
+    // 4) Enviar confirmacion usando template de Handlebars
+    // Get current price to include in email
+    const currentPrice = await this.combosService.getCurrentPrice(combo.id);
+
+    await this.emailQueueService.enqueueTemplateEmail({
+      to: email,
+      subject: 'Orden Creada - JUVECONF 2025',
+      template: 'order-pending',
+      context: {
+        userName: email.split('@')[0],
+        orderId: createdOrder!.id,
+        amount: currentPrice.price,
+      },
+      emailType: EmailType.ORDEN_CASH,
+      orderId: createdOrder!.id,
+    });
+
+    console.log('[createCashOrder] Orden de pago en efectivo creada con éxito. Email encolado.');
+
+    return {
+      success: true,
       orderID: createdOrder!.id
     };
   }
@@ -443,8 +406,29 @@ export class TransfersService {
     let createdOrder: Order;
     try {
       await this.prisma.$transaction(async (tx) => {
-        const totalAmount = combo.price * dto.quantity;
+        // Get current price with presales
+        const currentPrice = await this.combosService.getCurrentPrice(combo.id);
+        const totalAmount = currentPrice.price * dto.quantity;
         console.log('[createCashOrderSimple] Total calculado:', totalAmount);
+
+        // Create order snapshot
+        const orderSnapshot = {
+          combo: {
+            id: combo.id,
+            name: combo.name,
+            basePrice: combo.price,
+            appliedPrice: currentPrice.price,
+            personsIncluded: combo.personsIncluded,
+            description: combo.description,
+          },
+          preSale: currentPrice.isPreSale ? {
+            id: currentPrice.preSaleId,
+            name: currentPrice.preSaleName,
+            discount: currentPrice.discount,
+          } : null,
+          timestamp: new Date().toISOString(),
+          quantity: dto.quantity,
+        };
 
         const order = await tx.order.create({
           data: {
@@ -453,9 +437,11 @@ export class TransfersService {
             paymentType: PaymentType.CASH,
             year: 2025,
             eventId: dto.eventId,
+            comboId: combo.id, // CRITICAL: Added missing comboId
             email: dto.email,
             cuil: dto.cuil,
             phone: dto.phone,
+            orderSnapshot, // Save snapshot
           },
         });
         console.log('[createCashOrderSimple] Orden creada:', order.id);

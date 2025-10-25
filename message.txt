@@ -1,0 +1,5 @@
+Subject: Prueba SMTP Zoho
+From: equipo@juveconfe.com
+To: padillabrian830@gmail.com
+
+Hola señor, esto es una prueba por curl.

@@ -35,7 +35,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() loginUserDto: LoginUserDto,
-  ): Promise<{ access_token: string }> {
+  ): Promise<{ access_token: string; requirePasswordChange?: boolean }> {
     try {
       // Validar que los datos requeridos estén presentes
       if (!loginUserDto.email || !loginUserDto.password) {
@@ -49,25 +49,25 @@ export class AuthController {
       }
 
       const { email, password } = loginUserDto;
-      
+
       this.logger.log(`Intento de login para email: ${email}`);
-      
-      const access_token = await this.authService.login(email, password);
-      
+
+      const result = await this.authService.login(email, password);
+
       this.logger.log(`Login exitoso para email: ${email}`);
-      
-      return { access_token };
+
+      return result;
     } catch (error) {
       // Log del error para depuración
       this.logger.error(`Error en login: ${error.message}`, error.stack);
-      
+
       // Re-lanzar errores HTTP conocidos
-      if (error instanceof BadRequestException || 
-          error instanceof NotFoundException || 
+      if (error instanceof BadRequestException ||
+          error instanceof NotFoundException ||
           error.name === 'UnauthorizedException') {
         throw error;
       }
-      
+
       // Para cualquier otro error, devolver un error interno del servidor
       throw new InternalServerErrorException('Error interno del servidor');
     }
@@ -142,6 +142,44 @@ export class AuthController {
         throw error;
       }
       
+      // Para cualquier otro error, devolver un error interno del servidor
+      throw new InternalServerErrorException('Error interno del servidor');
+    }
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(
+    @Body('email') email: string,
+  ): Promise<{ message: string }> {
+    try {
+      // Validar que el email esté presente
+      if (!email) {
+        throw new BadRequestException('El email es requerido');
+      }
+
+      // Validar formato básico del email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new BadRequestException('Formato de email inválido');
+      }
+
+      this.logger.log(`Solicitud de reset de contraseña para email: ${email}`);
+
+      const result = await this.authService.requestPasswordReset(email);
+
+      this.logger.log(`Reset de contraseña procesado para email: ${email}`);
+
+      return result;
+    } catch (error) {
+      // Log del error para depuración
+      this.logger.error(`Error en forgot-password: ${error.message}`, error.stack);
+
+      // Re-lanzar errores HTTP conocidos
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
       // Para cualquier otro error, devolver un error interno del servidor
       throw new InternalServerErrorException('Error interno del servidor');
     }
