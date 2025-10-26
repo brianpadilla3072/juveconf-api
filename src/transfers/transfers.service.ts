@@ -133,7 +133,7 @@ export class TransfersService {
             userId: dto.userId,
             eventId: dto.eventId,
             total: totalAmount,
-            status: OrderStatus.PENDING,
+            status: OrderStatus.REVIEW,
             email: dto.email,
             cuil: dto.cuil,
             phone: dto.phone,
