@@ -23,7 +23,15 @@ async function bootstrap() {
   }));
 
   app.enableCors({
-    origin: ['http://localhost:4321', 'http://localhost:3000', 'http://localhost:3001'],
+    origin: [
+      'http://localhost:4321',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://app.juveconfe.com',
+      'https://app.juveconfe.com',
+      'http://juveconfe.com',
+      'https://juveconfe.com'
+    ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     exposedHeaders: '*',
