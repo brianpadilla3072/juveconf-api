@@ -29,8 +29,12 @@ async function bootstrap() {
       'http://localhost:3001',
       'http://app.juveconfe.com',
       'https://app.juveconfe.com',
+      'http://www.app.juveconfe.com',
+      'https://www.app.juveconfe.com',
       'http://juveconfe.com',
-      'https://juveconfe.com'
+      'https://juveconfe.com',
+      'http://www.juveconfe.com',
+      'https://www.juveconfe.com'
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],

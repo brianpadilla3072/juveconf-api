@@ -1,9 +1,5 @@
-// Aplicación de consorcios ("events") con múltiples preventas, pagos independientes,
-// registro de invitados y campos de auditoría (createdAt, updatedAt, deletedAt)
-
 generator client {
   provider = "prisma-client-js"
-  // output = "../generated/prisma" // Habilitar si desea customizar el path
 }
 
 datasource db {
@@ -11,15 +7,272 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Enumeraciones
-enum UserRole {
-  SUPERADMIN
-  DEVELOPER
-  ADMIN
-  EDITOR
-  COLLABORATOR
-  USER
+model Combo {
+  id                String              @id
+  name              String
+  price             Float
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  deletedAt         DateTime?
+  eventId           String
+  description       String?
+  displayOrder      Int                 @default(0)
+  isActive          Boolean             @default(true)
+  isFree            Boolean             @default(false)
+  isPublished       Boolean             @default(false)
+  maxPersons        Int?
+  metadata          Json?
+  personsIncluded   Int
+  Event             Event               @relation(fields: [eventId], references: [id])
+  Order             Order[]
+  PreSaleComboPrice PreSaleComboPrice[]
+
+  @@unique([eventId, name])
+  @@index([eventId, isActive])
 }
+
+model Egreso {
+  id         String    @id
+  fecha      DateTime
+  concepto   String
+  monto      Float
+  metodoPago String
+  notas      String?
+  year       Int
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime
+  deletedAt  DateTime?
+
+  @@index([year, fecha])
+}
+
+model EmailQueue {
+  id            String      @id
+  to            String
+  subject       String
+  html          String?
+  template      String?
+  context       Json?
+  emailType     EmailType
+  orderId       String?
+  paymentId     String?
+  status        EmailStatus @default(PENDING)
+  attempts      Int         @default(0)
+  lastAttemptAt DateTime?
+  sentAt        DateTime?
+  errorMessage  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime
+  Order         Order?      @relation(fields: [orderId], references: [id])
+  Payment       Payment?    @relation(fields: [paymentId], references: [id])
+
+  @@index([createdAt])
+  @@index([status, attempts])
+}
+
+model Event {
+  id             String    @id
+  year           Int
+  topic          String
+  capacity       Int
+  salesStartDate DateTime
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime
+  deletedAt      DateTime?
+  description    String?
+  eventDays      Json?
+  eventEndDate   DateTime?
+  eventStartDate DateTime?
+  isActive       Boolean   @default(true)
+  location       String?
+  salesEndDate   DateTime?
+  Combo          Combo[]
+  Order          Order[]
+  PreSale        PreSale[]
+
+  @@index([eventStartDate])
+  @@index([salesStartDate])
+  @@index([year])
+}
+
+model Ingreso {
+  id         String    @id
+  fecha      DateTime
+  concepto   String
+  monto      Float
+  metodoPago String
+  notas      String?
+  year       Int
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime
+  deletedAt  DateTime?
+
+  @@index([year, fecha])
+}
+
+model Invitee {
+  id         String    @id
+  name       String
+  cuil       String
+  orderId    String?
+  paymentId  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime
+  deletedAt  DateTime?
+  email      String?
+  phone      String?
+  attendance Json?
+  metadata   String?
+  Order      Order?    @relation(fields: [orderId], references: [id])
+  Payment    Payment?  @relation(fields: [paymentId], references: [id])
+
+  @@index([cuil])
+  @@index([email])
+  @@index([orderId])
+  @@index([paymentId])
+}
+
+model Order {
+  id                String       @id
+  year              Int
+  userId            String?
+  eventId           String
+  total             Float
+  status            OrderStatus  @default(PENDING)
+  paymentType       PaymentType
+  externalReference String?      @unique
+  metadataToken     String?
+  preferenceId      String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime
+  deletedAt         DateTime?
+  cuil              String
+  email             String
+  phone             String?
+  comboId           String
+  orderSnapshot     Json?
+  EmailQueue        EmailQueue[]
+  Invitee           Invitee[]
+  Combo             Combo        @relation(fields: [comboId], references: [id])
+  Event             Event        @relation(fields: [eventId], references: [id])
+  User              User?        @relation(fields: [userId], references: [id])
+  Payment           Payment[]
+
+  @@index([comboId])
+  @@index([createdAt])
+  @@index([cuil])
+  @@index([email])
+  @@index([eventId])
+  @@index([status, paymentType])
+  @@index([userId])
+}
+
+model Payment {
+  id                String       @id
+  year              Int
+  orderId           String
+  amount            Float
+  type              PaymentType
+  externalReference String?
+  userId            String?
+  payerName         String?
+  payerEmail        String?
+  payerDni          String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime
+  deletedAt         DateTime?
+  payerPhone        String?
+  EmailQueue        EmailQueue[]
+  Invitee           Invitee[]
+  Order             Order        @relation(fields: [orderId], references: [id])
+  User              User?        @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([orderId])
+  @@index([type])
+  @@index([userId])
+}
+
+model PreSale {
+  id                String              @id
+  eventId           String
+  startDate         DateTime
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  deletedAt         DateTime?
+  description       String?
+  endDate           DateTime
+  isActive          Boolean             @default(true)
+  name              String
+  Event             Event               @relation(fields: [eventId], references: [id])
+  PreSaleComboPrice PreSaleComboPrice[]
+
+  @@unique([eventId, name])
+  @@index([eventId, startDate, endDate])
+}
+
+model PreSaleComboPrice {
+  id        String   @id
+  preSaleId String
+  comboId   String
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Combo     Combo    @relation(fields: [comboId], references: [id])
+  PreSale   PreSale  @relation(fields: [preSaleId], references: [id], onDelete: Cascade)
+
+  @@unique([preSaleId, comboId])
+  @@index([comboId])
+  @@index([preSaleId])
+}
+
+model User {
+  id                    String       @id
+  auth0Id               String?      @unique
+  provider              AuthProvider @default(LOCAL)
+  dni                   String       @unique
+  name                  String
+  givenName             String?
+  familyName            String?
+  nickname              String?
+  email                 String       @unique
+  emailVerified         Boolean      @default(false)
+  picture               String?
+  locale                String?
+  password              String?
+  role                  UserRole     @default(USER)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime
+  lastLogin             DateTime?
+  deletedAt             DateTime?
+  requirePasswordChange Boolean      @default(false)
+  Order                 Order[]
+  Payment               Payment[]
+
+  @@index([dni])
+  @@index([email, deletedAt])
+  @@index([role])
+}
+
+enum AuthProvider {
+  LOCAL
+  AUTH0
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum EmailType {
+  ORDEN_TRANSFER
+  ORDEN_CASH
+  TICKET_DOWNLOAD
+  PASSWORD_RESET
+  CUSTOM
+}
+
 enum OrderStatus {
   PENDING
   REVIEW
@@ -33,315 +286,11 @@ enum PaymentType {
   CASH
 }
 
-enum AuthProvider {
-  LOCAL
-  AUTH0
-}
-
-enum EmailType {
-  ORDEN_TRANSFER
-  ORDEN_CASH
-  TICKET_DOWNLOAD
-  PASSWORD_RESET
-  CUSTOM
-}
-
-enum EmailStatus {
-  PENDING
-  SENT
-  FAILED
-}
-
-// Modelos principales
-model User {
-  id              String       @id @default(uuid())
-  auth0Id         String?      @unique
-  provider        AuthProvider @default(LOCAL)
-  dni             String       @unique
-  name            String
-  givenName       String?
-  familyName      String?
-  nickname        String?
-  email           String       @unique
-  emailVerified   Boolean      @default(false)
-  picture         String?
-  locale          String?
-  password        String?      // Opcional si el usuario se registra vía Auth0
-  role            UserRole     @default(USER)
-  requirePasswordChange Boolean  @default(false)  // Fuerza al usuario a cambiar su contraseña temporal
-
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  lastLogin       DateTime?
-  deletedAt       DateTime?
-
-  orders          Order[]
-  payments        Payment[]
-
-  @@index([email, deletedAt])
-  @@index([dni])
-  @@index([role])
-}
-
-model Event {
-  id              String       @id @default(uuid())
-  year            Int
-  topic           String
-  capacity        Int
-  salesStartDate  DateTime
-
-  // Nuevos campos opcionales
-  salesEndDate    DateTime?
-  location        String?
-  description     String?
-  isActive        Boolean      @default(true)
-
-  // Fechas del evento (NO de ventas)
-  eventStartDate  DateTime?    // Fecha de inicio del evento
-  eventEndDate    DateTime?    // Fecha de fin del evento
-  eventDays       Json?        // Array calculado automáticamente de días: { days: [...], totalDays: N }
-
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  deletedAt       DateTime?
-
-  preSales        PreSale[]
-  orders          Order[]
-  combos          Combo[]
-
-  @@index([year])
-  @@index([salesStartDate])
-  @@index([eventStartDate])
-}
-
-model Combo {
-  id              String       @id @default(uuid())
-  name            String
-  price           Float        // Precio base
-  personsIncluded Int          // Cantidad de personas que incluye el combo
-
-  // Campos opcionales
-  maxPersons      Int?
-  isActive        Boolean      @default(true)
-  isPublished     Boolean      @default(false)  // Indica si el combo está publicado para el público
-  isFree          Boolean      @default(false)  // Indica si el combo es gratuito
-  description     String?
-  displayOrder    Int          @default(0)
-  metadata        Json?        // Datos flexibles como JSON
-
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  deletedAt       DateTime?
-
-  eventId         String
-  event           Event        @relation(fields: [eventId], references: [id])
-
-  orders          Order[]
-  preSalePrices   PreSaleComboPrice[]
-
-  @@unique([eventId, name])
-  @@index([eventId, isActive])
-}
-
-// Rediseño completo de PreSale
-model PreSale {
-  id              String       @id @default(uuid())
-  eventId         String
-  event           Event        @relation(fields: [eventId], references: [id])
-
-  name            String       // "Preventa Mayo-Junio"
-  description     String?
-
-  startDate       DateTime
-  endDate         DateTime
-  isActive        Boolean      @default(true)
-
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  deletedAt       DateTime?
-
-  comboPrices     PreSaleComboPrice[]
-
-  @@unique([eventId, name])
-  @@index([eventId, startDate, endDate])
-}
-
-// Nueva tabla intermedia: PreSale ↔ Combo con precio específico
-model PreSaleComboPrice {
-  id              String       @id @default(uuid())
-
-  preSaleId       String
-  preSale         PreSale      @relation(fields: [preSaleId], references: [id], onDelete: Cascade)
-
-  comboId         String
-  combo           Combo        @relation(fields: [comboId], references: [id])
-
-  price           Float        // Precio específico para esta preventa
-
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  @@unique([preSaleId, comboId])
-  @@index([preSaleId])
-  @@index([comboId])
-}
-
-model Order {
-  id                String       @id @default(uuid())
-  year              Int
-  userId            String?
-  user              User?        @relation(fields: [userId], references: [id])
-  eventId           String
-  event             Event        @relation(fields: [eventId], references: [id])
-
-  // Relación one-to-one con Combo (cada orden tiene 1 combo)
-  comboId           String
-  combo             Combo        @relation(fields: [comboId], references: [id])
-
-  total             Float
-  status            OrderStatus  @default(PENDING)
-  paymentType       PaymentType
-  externalReference String?      @unique
-  metadataToken     String?
-  preferenceId      String?
-
-  // Nuevo campo: Snapshot del estado al momento de compra
-  orderSnapshot     Json?
-
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  deletedAt         DateTime?
-  email             String
-  cuil              String
-  phone             String?
-  payments          Payment[]
-  invitees          Invitee[]
-  emailQueue        EmailQueue[]
-
-  @@index([userId])
-  @@index([eventId])
-  @@index([comboId])
-  @@index([status, paymentType])
-  @@index([email])
-  @@index([cuil])
-  @@index([createdAt])
-}
-
-model Payment {
-  id                String       @id @default(uuid())
-  year              Int
-
-  orderId           String
-  order             Order        @relation(fields: [orderId], references: [id])
-
-  amount            Float
-  type              PaymentType
-  externalReference String?
-
-  userId            String?
-  user              User?        @relation(fields: [userId], references: [id])
-
-  payerName         String?
-  payerEmail        String?
-  payerDni          String?
-  payerPhone        String?
-
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  deletedAt         DateTime?
-
-  invitees          Invitee[]
-  emailQueue        EmailQueue[]
-
-  @@index([orderId])
-  @@index([userId])
-  @@index([type])
-  @@index([createdAt])
-}
-
-model Invitee {
-  id              String        @id @default(uuid())
-  name            String
-  cuil            String
-  email           String?
-  phone           String?
-  orderId         String?
-  order           Order?        @relation(fields: [orderId], references: [id])
-  paymentId       String?
-  payment         Payment?      @relation(fields: [paymentId], references: [id])
-
-  // Sistema dinámico de asistencia por día
-  // Estructura: { days: { "1": { attended: true, timestamp: "..." }, "2": { attended: false }, ... } }
-  attendance      Json?
-
-  // Metadata adicional como JSON string: { email?, phone?, birthdate?, city?, church? }
-  metadata        String?
-
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  deletedAt       DateTime?
-
-  @@index([orderId])
-  @@index([paymentId])
-  @@index([cuil])
-  @@index([email])
-}
-
-model Ingreso {
-  id            String    @id @default(uuid())
-  fecha         DateTime
-  concepto      String
-  monto         Float
-  metodoPago    String
-  notas         String?
-  year          Int
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
-
-  @@index([year, fecha])
-}
-
-model Egreso {
-  id            String    @id @default(uuid())
-  fecha         DateTime
-  concepto      String
-  monto         Float
-  metodoPago    String
-  notas         String?
-  year          Int
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
-
-  @@index([year, fecha])
-}
-
-model EmailQueue {
-  id              String       @id @default(uuid())
-  to              String
-  subject         String
-  html            String?      @db.Text  // Optional for template-based emails
-
-  // Template fields
-  template        String?      // Template name for Handlebars
-  context         Json?        // Context variables for template
-
-  emailType       EmailType
-  orderId         String?
-  order           Order?       @relation(fields: [orderId], references: [id])
-  paymentId       String?
-  payment         Payment?     @relation(fields: [paymentId], references: [id])
-
-  status          EmailStatus  @default(PENDING)
-  attempts        Int          @default(0)
-  lastAttemptAt   DateTime?
-  sentAt          DateTime?
-  errorMessage    String?      @db.Text
-
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  @@index([status, attempts])
-  @@index([createdAt])
+enum UserRole {
+  SUPERADMIN
+  DEVELOPER
+  ADMIN
+  EDITOR
+  COLLABORATOR
+  USER
 }
