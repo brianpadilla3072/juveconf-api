@@ -8,11 +8,11 @@ datasource db {
 }
 
 model Combo {
-  id                String              @id
+  id                String              @id @default(uuid())
   name              String
   price             Float
   createdAt         DateTime            @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime            @updatedAt
   deletedAt         DateTime?
   eventId           String
   description       String?
@@ -32,7 +32,7 @@ model Combo {
 }
 
 model Egreso {
-  id         String    @id
+  id         String    @id @default(uuid())
   fecha      DateTime
   concepto   String
   monto      Float
@@ -40,14 +40,14 @@ model Egreso {
   notas      String?
   year       Int
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime
+  updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
   @@index([year, fecha])
 }
 
 model EmailQueue {
-  id            String      @id
+  id            String      @id @default(uuid())
   to            String
   subject       String
   html          String?
@@ -62,7 +62,7 @@ model EmailQueue {
   sentAt        DateTime?
   errorMessage  String?
   createdAt     DateTime    @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime    @updatedAt
   Order         Order?      @relation(fields: [orderId], references: [id])
   Payment       Payment?    @relation(fields: [paymentId], references: [id])
 
@@ -71,13 +71,13 @@ model EmailQueue {
 }
 
 model Event {
-  id             String    @id
+  id             String    @id @default(uuid())
   year           Int
   topic          String
   capacity       Int
   salesStartDate DateTime
   createdAt      DateTime  @default(now())
-  updatedAt      DateTime
+  updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
   description    String?
   eventDays      Json?
@@ -96,7 +96,7 @@ model Event {
 }
 
 model Ingreso {
-  id         String    @id
+  id         String    @id @default(uuid())
   fecha      DateTime
   concepto   String
   monto      Float
@@ -104,20 +104,20 @@ model Ingreso {
   notas      String?
   year       Int
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime
+  updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
   @@index([year, fecha])
 }
 
 model Invitee {
-  id         String    @id
+  id         String    @id @default(uuid())
   name       String
   cuil       String
   orderId    String?
   paymentId  String?
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime
+  updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
   email      String?
   phone      String?
@@ -133,7 +133,7 @@ model Invitee {
 }
 
 model Order {
-  id                String       @id
+  id                String       @id @default(uuid())
   year              Int
   userId            String?
   eventId           String
@@ -144,7 +144,7 @@ model Order {
   metadataToken     String?
   preferenceId      String?
   createdAt         DateTime     @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime     @updatedAt
   deletedAt         DateTime?
   cuil              String
   email             String
@@ -168,7 +168,7 @@ model Order {
 }
 
 model Payment {
-  id                String       @id
+  id                String       @id @default(uuid())
   year              Int
   orderId           String
   amount            Float
@@ -179,7 +179,7 @@ model Payment {
   payerEmail        String?
   payerDni          String?
   createdAt         DateTime     @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime     @updatedAt
   deletedAt         DateTime?
   payerPhone        String?
   EmailQueue        EmailQueue[]
@@ -194,11 +194,11 @@ model Payment {
 }
 
 model PreSale {
-  id                String              @id
+  id                String              @id @default(uuid())
   eventId           String
   startDate         DateTime
   createdAt         DateTime            @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime            @updatedAt
   deletedAt         DateTime?
   description       String?
   endDate           DateTime
@@ -212,12 +212,12 @@ model PreSale {
 }
 
 model PreSaleComboPrice {
-  id        String   @id
+  id        String   @id @default(uuid())
   preSaleId String
   comboId   String
   price     Float
   createdAt DateTime @default(now())
-  updatedAt DateTime
+  updatedAt DateTime @updatedAt
   Combo     Combo    @relation(fields: [comboId], references: [id])
   PreSale   PreSale  @relation(fields: [preSaleId], references: [id], onDelete: Cascade)
 
@@ -227,7 +227,7 @@ model PreSaleComboPrice {
 }
 
 model User {
-  id                    String       @id
+  id                    String       @id @default(uuid())
   auth0Id               String?      @unique
   provider              AuthProvider @default(LOCAL)
   dni                   String       @unique
@@ -242,7 +242,7 @@ model User {
   password              String?
   role                  UserRole     @default(USER)
   createdAt             DateTime     @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime     @updatedAt
   lastLogin             DateTime?
   deletedAt             DateTime?
   requirePasswordChange Boolean      @default(false)
