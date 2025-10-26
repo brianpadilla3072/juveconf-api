@@ -11,8 +11,6 @@ async function hashPassword(password: string): Promise<string> {
 async function seedUsers() {
   const users = [
     { email: 'padillabrian@gmail.com', password: 'Nopasaran3072', dni: '42469579', name: 'Brian Padilla', role: UserRole.DEVELOPER },
-    { email: 'brisgabella@gmail.com', password: 'juveconfBri2025', dni: '00000001', name: 'Brisa Gabella', role: UserRole.ADMIN },
-    { email: 'estefaniavicvazquez@hotmail.com', password: 'JuveconfEstef2025', dni: '00000002', name: 'Estefania Vazquez', role: UserRole.ADMIN },
     { email: 'aldiruiz2024@gmail.com', password: 'aldiruiz20224', dni: '00000003', name: 'Aldana Micaela Ruiz Diaz', role: UserRole.ADMIN },
   ];
 
@@ -74,10 +72,10 @@ async function seedCombos(eventId: string) {
       persons: 1,
       max: 1,
       isFree: true,
-      desc: 'Ideal si querés venir a las reuniones principales y no podés quedarte todo el fin de semana.',
+      desc: 'Ideal si querés venir a las reuniones principales o no podés quedarte todo el fin de semana.',
       benefits: [
         'Acceso a las 4 plenarias generales',
-        'Escucha la palabra de Dios junto a toda la comunidad',
+        'Escuchá la Palabra de Dios junto a toda la comunidad',
         'Participación libre y abierta sin costo'
       ]
     },
@@ -87,13 +85,14 @@ async function seedCombos(eventId: string) {
       persons: 1,
       max: 10,
       isFree: false,
-      desc: 'Ideal para vivir toda la experiencia completa de JuveConf',
+      desc: 'Ideal para vivir toda la experiencia completa de JUVEConfe',
       benefits: [
         'Acceso a las 4 plenarias generales',
-        '2 menú del buffet oficial del evento',
         'Participación en todos los talleres',
-        'Kit de inscripción',
-        'Hospedaje gratuito en casa de los hermanos de la iglesia'
+        'Actividades deportivas',
+        'Hospedaje gratuito en casa de los hermanos de la iglesia',
+        'Kit completo de materiales para talleres',
+        'Acceso al buffet oficial del evento (Las comidas no están incluidas)'
       ]
     },
     {
@@ -105,10 +104,11 @@ async function seedCombos(eventId: string) {
       desc: 'Ideal para quienes quieren todo el paquete completo y llevarse la remera oficial',
       benefits: [
         'Acceso a las 4 plenarias generales',
-        '2 menú del buffet oficial del evento',
         'Participación en todos los talleres',
-        'Kit de inscripción',
+        'Actividades deportivas',
         'Hospedaje gratuito en casa de los hermanos de la iglesia',
+        'Kit completo de materiales para talleres',
+        'Acceso al buffet oficial del evento (Las comidas no están incluidas)',
         'Remera oficial'
       ],
       merchandise: {
