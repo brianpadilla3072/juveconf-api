@@ -40,7 +40,7 @@ export class PresalesService {
         startDate: new Date(dto.startDate),
         endDate: new Date(dto.endDate),
         isActive: dto.isActive ?? true,
-        comboPrices: {
+        PreSaleComboPrice: {
           create: dto.comboPrices.map(cp => ({
             comboId: cp.comboId,
             price: cp.price,
@@ -48,9 +48,9 @@ export class PresalesService {
         },
       },
       include: {
-        comboPrices: {
+        PreSaleComboPrice: {
           include: {
-            combo: true,
+            Combo: true,
           },
         },
       },
@@ -63,10 +63,10 @@ export class PresalesService {
         deletedAt: null,
       },
       include: {
-        event: true,
-        comboPrices: {
+        Event: true,
+        PreSaleComboPrice: {
           include: {
-            combo: true,
+            Combo: true,
           },
         },
       },
@@ -86,10 +86,10 @@ export class PresalesService {
         endDate: { gte: now },
       },
       include: {
-        event: true,
-        comboPrices: {
+        Event: true,
+        PreSaleComboPrice: {
           include: {
-            combo: true,
+            Combo: true,
           },
         },
       },
@@ -103,10 +103,10 @@ export class PresalesService {
         deletedAt: null,
       },
       include: {
-        event: true,
-        comboPrices: {
+        Event: true,
+        PreSaleComboPrice: {
           include: {
-            combo: true,
+            Combo: true,
           },
         },
       },
@@ -137,7 +137,7 @@ export class PresalesService {
         where: { preSaleId: id },
       });
 
-      updateData.comboPrices = {
+      updateData.PreSaleComboPrice = {
         create: dto.comboPrices.map(cp => ({
           comboId: cp.comboId,
           price: cp.price,
@@ -149,9 +149,9 @@ export class PresalesService {
       where: { id },
       data: updateData,
       include: {
-        comboPrices: {
+        PreSaleComboPrice: {
           include: {
-            combo: true,
+            Combo: true,
           },
         },
       },
@@ -177,7 +177,7 @@ export class PresalesService {
     const preSalePrice = await this.prisma.preSaleComboPrice.findFirst({
       where: {
         comboId,
-        preSale: {
+        PreSale: {
           isActive: true,
           startDate: { lte: now },
           endDate: { gte: now },
@@ -185,15 +185,15 @@ export class PresalesService {
         },
       },
       include: {
-        preSale: true,
+        PreSale: true,
       },
     });
 
     if (preSalePrice) {
       return {
         price: preSalePrice.price,
-        preSaleName: preSalePrice.preSale.name,
-        preSaleId: preSalePrice.preSale.id,
+        preSaleName: preSalePrice.PreSale.name,
+        preSaleId: preSalePrice.PreSale.id,
         isPreSale: true,
       };
     }

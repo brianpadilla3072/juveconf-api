@@ -294,10 +294,10 @@ export class DashboardService {
     const events = await this.prisma.event.findMany({
       where: eventWhere,
       include: {
-        orders: {
+        Order: {
           where: { deletedAt: null },
           include: {
-            invitees: {
+            Invitee: {
               where: { deletedAt: null },
               select: { id: true, attendance: true }
             }
@@ -307,7 +307,7 @@ export class DashboardService {
     });
 
     const attendanceByEvent = events.map(event => {
-      const invitees = event.orders.flatMap(order => order.invitees);
+      const invitees = event.Order.flatMap(order => order.Invitee);
       const totalInvitees = invitees.length;
 
       // Calcular asistencia por día desde JSON
@@ -451,10 +451,10 @@ export class DashboardService {
     const events = await this.prisma.event.findMany({
       where: { year, deletedAt: null },
       include: {
-        orders: {
+        Order: {
           where: { deletedAt: null },
           include: {
-            invitees: {
+            Invitee: {
               where: { deletedAt: null },
               select: { id: true, attendance: true }
             }
@@ -465,8 +465,8 @@ export class DashboardService {
     });
 
     const eventsRanking = events.map(event => {
-      const orders = event.orders;
-      const invitees = orders.flatMap(order => order.invitees);
+      const orders = event.Order;
+      const invitees = orders.flatMap(order => order.Invitee);
       const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
 
       // Calcular asistencia por día desde JSON

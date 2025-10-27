@@ -17,15 +17,15 @@ export class InviteesService {
     return this.prisma.invitee.findMany({
       where: {
         deletedAt: null,
-        payment: {
+        Payment: {
           is: {
             year: year,
           },
         },
       },
       include: {
-        payment: true,
-        order: true,
+        Payment: true,
+        Order: true,
       },
     });
   }
@@ -34,8 +34,8 @@ export class InviteesService {
     const invitee = await this.prisma.invitee.findUnique({
       where: { id },
       include: {
-        payment: true,
-        order: true,
+        Payment: true,
+        Order: true,
       },
     });
 
@@ -134,7 +134,7 @@ async getInviteesEmails(filter: FilterInviteesDto) {
         { email: { not: null } },
         { email: { not: '' } },
       ],
-      payment: {
+      Payment: {
         is: {
           year: year,
         },
@@ -144,7 +144,7 @@ async getInviteesEmails(filter: FilterInviteesDto) {
       id: true,
       name: true,
       email: true,
-      payment: {
+      Payment: {
         select: {
           id: true,
           amount: true,
@@ -162,7 +162,7 @@ async getInviteesEmails(filter: FilterInviteesDto) {
         email: invitee.email,
         name: invitee.name,
         id: invitee.id,
-        paymentInfo: invitee.payment,
+        paymentInfo: invitee.Payment,
       });
     }
   });
@@ -192,7 +192,7 @@ async getInviteesEmails(filter: FilterInviteesDto) {
         email: true,
         phone: true,
         paymentId: true,
-        order: {
+        Order: {
           select: {
             eventId: true
           }

@@ -69,9 +69,9 @@ export class PaymentsService {
       const payment = await this.prisma.payment.findUnique({
         where: { id: paymentId },
         include: {
-          order: {
+          Order: {
             include: {
-              invitees: true
+              Invitee: true
             }
           }
         }
@@ -83,13 +83,13 @@ export class PaymentsService {
 
       const paymentData = {
         ...payment,
-        invitees: payment.order?.invitees || []
+        invitees: payment.Order?.Invitee || []
       };
 
       // Create a token with the payment data using signMetadata
       const token = this.jwtService.signMetadata(paymentData);
 
-      return { token, invitees: payment.order?.invitees || [] };
+      return { token, invitees: payment.Order?.Invitee || [] };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       const errorStack = error instanceof Error ? error.stack : '';
@@ -126,7 +126,7 @@ export class PaymentsService {
     }
 
     if (filters?.eventId) {
-      whereClause.order = {
+      whereClause.Order = {
         eventId: filters.eventId
       };
     }
@@ -200,7 +200,7 @@ export class PaymentsService {
           id: { in: eventIds },
         },
         include: {
-          event: {
+          Event: {
             select: {
               id: true,
               topic: true,
@@ -214,7 +214,7 @@ export class PaymentsService {
         const orderDetail = eventDetails.find(order => order.id === payment.orderId);
         return {
           ...payment,
-          event: orderDetail?.event || null,
+          event: orderDetail?.Event || null,
           orderId: payment.orderId
         };
       });
@@ -252,16 +252,16 @@ export class PaymentsService {
     return await this.prisma.payment.findMany({
       where: whereClause,
       include: {
-        order: {
+        Order: {
           include: {
-            event: {
+            Event: {
               select: {
                 id: true,
                 topic: true,
                 year: true,
               }
             },
-            combo: {
+            Combo: {
               select: {
                 id: true,
                 name: true,
@@ -270,7 +270,7 @@ export class PaymentsService {
             }
           }
         },
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -296,9 +296,9 @@ export class PaymentsService {
     return await this.prisma.payment.findMany({
       where: whereClause,
       include: {
-        order: {
+        Order: {
           include: {
-            event: {
+            Event: {
               select: {
                 id: true,
                 topic: true,
@@ -320,9 +320,9 @@ export class PaymentsService {
         deletedAt: null,
       },
       include: {
-        order: {
+        Order: {
           include: {
-            event: {
+            Event: {
               select: {
                 id: true,
                 topic: true,
@@ -331,7 +331,7 @@ export class PaymentsService {
             }
           }
         },
-        user: {
+        User: {
           select: {
             id: true,
             name: true,

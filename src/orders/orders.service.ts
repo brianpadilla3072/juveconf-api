@@ -79,7 +79,7 @@ export class OrdersService {
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { combo: true },
+      include: { Combo: true },
     });
 
     if (!order) {
@@ -145,11 +145,11 @@ export class OrdersService {
         deletedAt: null
       },
       include: {
-        user: true,
-        event: true,
-        combo: true, // Relación one-to-one
-        payments: true,
-        invitees: true
+        User: true,
+        Event: true,
+        Combo: true, // Relación one-to-one
+        Payment: true,
+        Invitee: true
       },
       orderBy: {
         createdAt: 'desc'
@@ -169,7 +169,7 @@ export class OrdersService {
           };
 
           // Si no tiene invitados creados pero tiene attendees en el token, crear invitados virtuales
-          if (order.invitees.length === 0 && metadataPayload?.attendees?.length) {
+          if (order.Invitee.length === 0 && metadataPayload?.attendees?.length) {
             const virtualInvitees = metadataPayload.attendees.map(attendee => ({
               id: `virtual-${order.id}-${attendee.cuil}`,
               name: attendee.name,
@@ -326,9 +326,9 @@ export class OrdersService {
     // First, check if the order exists
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { 
-        payments: true,
-        invitees: true
+      include: {
+        Payment: true,
+        Invitee: true
       }
     });
 
@@ -337,12 +337,12 @@ export class OrdersService {
     }
 
     // If the order has payments, throw an error
-    if (order.payments && order.payments.length > 0) {
+    if (order.Payment && order.Payment.length > 0) {
       throw new BadRequestException('Cannot delete an order with associated payments');
     }
 
     // Delete related invitees first (if any)
-    if (order.invitees && order.invitees.length > 0) {
+    if (order.Invitee && order.Invitee.length > 0) {
       await this.prisma.invitee.deleteMany({
         where: { orderId: orderId }
       });

@@ -17,14 +17,14 @@ export class CombosService {
     const preSalePrice = await this.prisma.preSaleComboPrice.findFirst({
       where: {
         comboId,
-        preSale: {
+        PreSale: {
           isActive: true,
           startDate: { lte: now },
           endDate: { gte: now },
           deletedAt: null
         }
       },
-      include: { preSale: true }
+      include: { PreSale: true }
     });
 
     // Obtener el combo
@@ -33,8 +33,8 @@ export class CombosService {
     if (preSalePrice) {
       return {
         price: preSalePrice.price,
-        preSaleName: preSalePrice.preSale.name,
-        preSaleId: preSalePrice.preSale.id,
+        preSaleName: preSalePrice.PreSale.name,
+        preSaleId: preSalePrice.PreSale.id,
         isPreSale: true,
         originalPrice: combo.price,
         discount: combo.price - preSalePrice.price
@@ -89,16 +89,16 @@ export class CombosService {
         isActive: true,
       },
       include: {
-        event: {
+        Event: {
           select: {
             id: true,
             topic: true,
             year: true,
           }
         },
-        preSalePrices: {
+        PreSaleComboPrice: {
           where: {
-            preSale: {
+            PreSale: {
               isActive: true,
               startDate: { lte: now },
               endDate: { gte: now },
@@ -106,7 +106,7 @@ export class CombosService {
             }
           },
           include: {
-            preSale: true
+            PreSale: true
           }
         }
       },
@@ -124,7 +124,7 @@ export class CombosService {
         deletedAt: null,
       },
       include: {
-        event: {
+        Event: {
           select: {
             id: true,
             topic: true,
@@ -133,7 +133,7 @@ export class CombosService {
             salesStartDate: true,
           }
         },
-        orders: {
+        Order: {
           select: {
             id: true,
             status: true,
@@ -210,7 +210,7 @@ export class CombosService {
         deletedAt: null,
       },
       include: {
-        event: {
+        Event: {
           select: {
             id: true,
             topic: true,
@@ -232,16 +232,16 @@ export class CombosService {
         deletedAt: null,
       },
       include: {
-        event: {
+        Event: {
           select: {
             id: true,
             topic: true,
             year: true,
           }
         },
-        preSalePrices: {
+        PreSaleComboPrice: {
           where: {
-            preSale: {
+            PreSale: {
               isActive: true,
               deletedAt: null,
               startDate: { lte: now },
@@ -249,7 +249,7 @@ export class CombosService {
             }
           },
           include: {
-            preSale: true,
+            PreSale: true,
           },
           orderBy: {
             price: 'asc'
@@ -270,7 +270,7 @@ export class CombosService {
         deletedAt: null,
       },
       include: {
-        event: {
+        Event: {
           select: {
             id: true,
             topic: true,
@@ -329,7 +329,7 @@ export class CombosService {
         deletedAt: null,
       },
       include: {
-        event: {
+        Event: {
           select: {
             id: true,
             topic: true,

@@ -63,16 +63,16 @@ export class EventService {
     return this.prisma.event.findMany({
       where: { deletedAt: null },
       include: {
-        combos: {
+        Combo: {
           where: { deletedAt: null, isActive: true },
           orderBy: { displayOrder: 'asc' }
         },
-        preSales: {
+        PreSale: {
           where: { deletedAt: null },
           include: {
-            comboPrices: {
+            PreSaleComboPrice: {
               include: {
-                combo: true
+                Combo: true
               }
             }
           }
@@ -85,16 +85,16 @@ export class EventService {
     return this.prisma.event.findUnique({
       where: { id },
       include: {
-        combos: {
+        Combo: {
           where: { deletedAt: null },
           orderBy: { displayOrder: 'asc' }
         },
-        preSales: {
+        PreSale: {
           where: { deletedAt: null },
           include: {
-            comboPrices: {
+            PreSaleComboPrice: {
               include: {
-                combo: true
+                Combo: true
               }
             }
           }
@@ -107,16 +107,16 @@ export class EventService {
     return this.prisma.event.findFirst({
       where: { year, deletedAt: null },
       include: {
-        combos: {
+        Combo: {
           where: { deletedAt: null, isActive: true },
           orderBy: { displayOrder: 'asc' }
         },
-        preSales: {
+        PreSale: {
           where: { deletedAt: null },
           include: {
-            comboPrices: {
+            PreSaleComboPrice: {
               include: {
-                combo: true
+                Combo: true
               }
             }
           }
