@@ -332,7 +332,7 @@ export class MercadopagoService {
           context: {
             userName: order.email.split('@')[0],
             paymentId: payment.id,
-            ticketUrl: `${APP_CONFIG.url}/descargar-entrada?paymentId=${payment.id}`,
+            ticketUrl: `${APP_CONFIG.staticSiteUrlForEmails}/ticket/${payment.id}`,
           },
           emailType: EmailType.TICKET_DOWNLOAD,
           orderId: order.id,

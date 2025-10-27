@@ -174,4 +174,30 @@ async getInviteesEmails(filter: FilterInviteesDto) {
     total: uniqueEmailsArray.length,
   };
 }
+
+  /**
+   * Obtiene invitados por paymentId (endpoint público para descarga de entradas)
+   * Incluye eventId obtenido desde la relación con Order
+   */
+  async findByPaymentId(paymentId: string) {
+    return this.prisma.invitee.findMany({
+      where: {
+        paymentId,
+        deletedAt: null
+      },
+      select: {
+        id: true,
+        name: true,
+        cuil: true,
+        email: true,
+        phone: true,
+        paymentId: true,
+        order: {
+          select: {
+            eventId: true
+          }
+        }
+      }
+    });
+  }
 }

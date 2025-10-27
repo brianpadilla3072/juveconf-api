@@ -300,7 +300,7 @@ export class OrdersService {
           context: {
             userName: order.email.split('@')[0], // Use email username as fallback
             paymentId: payment.id,
-            ticketUrl: `${APP_CONFIG.url}/descargar-entrada/${payment.id}`,
+            ticketUrl: `${APP_CONFIG.staticSiteUrlForEmails}/ticket/${payment.id}`,
           },
           emailType: EmailType.TICKET_DOWNLOAD,
           orderId: order.id,

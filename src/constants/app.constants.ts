@@ -3,9 +3,16 @@ export const APP_CONFIG = {
   fullName: "Juventud en Conferencia",
   shortName: "JuveConf",
   url: "https://juveconf.com",
+
+  // URL del sitio estático para navegación web (puede ser local o producción)
+  staticSiteUrl: process.env.STATIC_SITE_URL || "http://localhost:4321",
+
+  // URL FIJA para emails (SIEMPRE producción, nunca localhost)
+  staticSiteUrlForEmails: "https://www.juveconfe.com",
+
   email: {
-    noreply: "noreply@juveconf.com",
-    support: "soporte@juveconf.com",
+    noreply: "equipo@juveconfe.com",
+    support: "equipo@juveconfe.com",
   },
 } as const;
 

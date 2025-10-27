@@ -84,4 +84,13 @@ export class InviteesController {
   ) {
     return this.inviteesService.markAttendanceByDay(id, data);
   }
+
+  /**
+   * Endpoint público para obtener invitados por paymentId
+   * Usado en sitio estático para descarga de entradas con QR
+   */
+  @Get('public/by-payment/:paymentId')
+  findByPaymentIdPublic(@Param('paymentId', new ParseUUIDPipe()) paymentId: string) {
+    return this.inviteesService.findByPaymentId(paymentId);
+  }
 }
