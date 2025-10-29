@@ -330,7 +330,6 @@ export class MercadopagoService {
           subject: 'Tu entrada - JUVECONF 2025',
           template: 'ticket-details',
           context: {
-            userName: order.email.split('@')[0],
             paymentId: payment.id,
             ticketUrl: `${APP_CONFIG.staticSiteUrlForEmails}/ticket/${payment.id}`,
           },

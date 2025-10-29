@@ -175,13 +175,16 @@ export class TransfersService {
       throw new CustomError(500, 'Error inesperado', 'Hubo un error al crear la orden de transferencia.');
     }
     // 4) Enviar confirmacion usando template de Handlebars
+    // Get current price to include in email
+    const currentPrice = await this.combosService.getCurrentPrice(combo.id);
+
     await this.emailQueueService.enqueueTemplateEmail({
       to: email,
       subject: 'Orden Creada - JUVECONF 2025',
       template: 'order-pending',
       context: {
-        userName: email.split('@')[0],
         orderId: createdOrder!.id,
+        amount: currentPrice.price,
       },
       emailType: EmailType.ORDEN_TRANSFER,
       orderId: createdOrder!.id,
@@ -333,7 +336,6 @@ export class TransfersService {
       subject: 'Orden Creada - JUVECONF 2025',
       template: 'order-pending',
       context: {
-        userName: email.split('@')[0],
         orderId: createdOrder!.id,
         amount: currentPrice.price,
       },

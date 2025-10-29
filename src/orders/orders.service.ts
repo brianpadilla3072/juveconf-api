@@ -291,35 +291,34 @@ export class OrdersService {
         );
       }
 
-      // 5. Enqueue email usando template de Handlebars
-      try {
-        await this.emailQueueService.enqueueTemplateEmail({
-          to: order.email,
-          subject: 'Tu entrada - JUVECONF 2025',
-          template: 'ticket-details',
-          context: {
-            userName: order.email.split('@')[0], // Use email username as fallback
-            paymentId: payment.id,
-            ticketUrl: `${APP_CONFIG.staticSiteUrlForEmails}/ticket/${payment.id}`,
-          },
-          emailType: EmailType.TICKET_DOWNLOAD,
-          orderId: order.id,
-          paymentId: payment.id,
-        });
-        this.logger.log(`Email encolado exitosamente para ${order.email}`);
-      } catch (error: any) {
-        this.logger.error(`Error al encolar email: ${error.message}`);
-        // El email falló, pero la orden ya está aprobada
-      }
-
-      return { success: true, data: order };
+      return { success: true, data: order, payment };
     }, {
       maxWait: 5000,
       timeout: 10000,
       isolationLevel: 'Serializable'
     });
 
-    return result;
+    // 5. Enqueue email OUTSIDE transaction (after commit)
+    try {
+      await this.emailQueueService.enqueueTemplateEmail({
+        to: result.data.email,
+        subject: 'Tu entrada - JUVECONF 2025',
+        template: 'ticket-details',
+        context: {
+          paymentId: result.payment.id,
+          ticketUrl: `${APP_CONFIG.staticSiteUrlForEmails}/ticket/${result.payment.id}`,
+        },
+        emailType: EmailType.TICKET_DOWNLOAD,
+        orderId: result.data.id,
+        paymentId: result.payment.id,
+      });
+      this.logger.log(`Email encolado exitosamente para ${result.data.email}`);
+    } catch (error: any) {
+      this.logger.error(`Error al encolar email: ${error.message}`);
+      // El email falló, pero la orden ya está aprobada
+    }
+
+    return { success: result.success, data: result.data };
   }
 
   async deleteOrder(orderId: string): Promise<Order> {

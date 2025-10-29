@@ -248,7 +248,6 @@ export class AuthService {
       subject: 'Contraseña Temporal - JUVECONF 2025',
       template: 'reset-password',
       context: {
-        userName: user.name || email.split('@')[0],
         temporaryPassword: temporaryPassword,
       },
       emailType: EmailType.PASSWORD_RESET,
