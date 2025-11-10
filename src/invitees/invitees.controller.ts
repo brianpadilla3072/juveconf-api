@@ -86,6 +86,17 @@ export class InviteesController {
   }
 
   /**
+   * Obtiene información completa del combo asociado a un invitado
+   * Maneja múltiples rutas de acceso y casos edge
+   */
+  @Get(':id/combo-info')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
+  getComboInfo(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.inviteesService.getComboInfoForInvitee(id);
+  }
+
+  /**
    * Endpoint público para obtener invitados por paymentId
    * Usado en sitio estático para descarga de entradas con QR
    */

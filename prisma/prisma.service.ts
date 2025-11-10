@@ -9,7 +9,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   /** Se ejecuta cuando NestJS inicializa este módulo */
   async onModuleInit() {
     await this.$connect();
-    console.log('🔌 Prisma connected');
   }
 
   /** Se ejecuta cuando NestJS destruye este módulo (shutdown) */

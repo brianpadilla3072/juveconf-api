@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { IsOptional, IsInt } from 'class-validator';
+import { IsOptional, IsInt, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class FilterInviteesDto {
@@ -7,4 +7,12 @@ export class FilterInviteesDto {
   @Type(() => Number)
   @IsInt()
   year?: number;
+
+  @IsOptional()
+  @IsUUID()
+  eventId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  comboId?: string;
 }

@@ -26,7 +26,8 @@ async function seedUsers() {
         role: user.role,
         provider: 'LOCAL',
         emailVerified: false,
-        locale: 'es-AR'
+        locale: 'es-AR',
+        requirePasswordChange: false
       },
     });
     console.log(`✅ Usuario: ${user.email}`);
