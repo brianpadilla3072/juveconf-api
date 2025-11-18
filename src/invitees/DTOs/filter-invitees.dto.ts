@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { IsOptional, IsInt, IsUUID } from 'class-validator';
+import { IsOptional, IsInt, IsUUID, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class FilterInviteesDto {
@@ -15,4 +15,9 @@ export class FilterInviteesDto {
   @IsOptional()
   @IsUUID()
   comboId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  comboIds?: string[];
 }

@@ -41,12 +41,16 @@ export class InviteesService {
   async findAll(filter: FilterInviteesDto) {
     const year = filter.year ?? new Date().getFullYear();
 
-    // Build Order filter if eventId or comboId provided
+    // Build Order filter if eventId or comboId/comboIds provided
     const orderFilter: any = {};
     if (filter.eventId) {
       orderFilter.eventId = filter.eventId;
     }
-    if (filter.comboId) {
+
+    // Support for multiple comboIds (new) or single comboId (backward compatibility)
+    if (filter.comboIds && filter.comboIds.length > 0) {
+      orderFilter.comboId = { in: filter.comboIds };
+    } else if (filter.comboId) {
       orderFilter.comboId = filter.comboId;
     }
 
@@ -56,7 +60,7 @@ export class InviteesService {
         is: {
           year: year,
           // Filter through Payment->Order relation (nested inside Payment)
-          ...(filter.eventId || filter.comboId ? {
+          ...(filter.eventId || filter.comboId || filter.comboIds ? {
             Order: {
               is: orderFilter
             }

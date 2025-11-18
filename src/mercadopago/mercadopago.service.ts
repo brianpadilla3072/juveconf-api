@@ -316,9 +316,10 @@ export class MercadopagoService {
             cuil: attendee.cuil,
             orderId: order.id,
             paymentId: payment.id,
+            metadata: attendee.metadata ? JSON.stringify(attendee.metadata) : null,
           },
         });
-        this.logger.debug(`Invitee creado: ${attendee.name} (${attendee.cuil})`);
+        this.logger.debug(`Invitee creado: ${attendee.name} (${attendee.cuil}) con metadata`);
       }
 
       this.logger.log(`Se crearon ${attendees.length} asistentes para la orden ID=${order.id}`);
