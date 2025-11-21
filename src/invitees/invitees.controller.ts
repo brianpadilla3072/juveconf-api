@@ -13,9 +13,9 @@ import {
   HttpStatus
 } from '@nestjs/common';
 import { InviteesService } from './invitees.service';
-import { FilterInviteesDto, CreateInviteeDto, UpdateInviteeDto } from './DTOs';
+import { FilterInviteesDto, CreateInviteeDto, UpdateInviteeDto, SearchInviteesDto } from './DTOs';
 import { ExportFilterDto } from './DTOs/export-filter.dto';
-import { MarkAttendanceByDayDto } from './DTOs/mark-attendance.dto';
+import { MarkAttendanceByDayDto, MarkAttendanceBatchDto } from './DTOs/mark-attendance.dto';
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
@@ -36,6 +36,13 @@ export class InviteesController {
   @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
   findAll(@Query() filter: FilterInviteesDto) {
     return this.inviteesService.findAll(filter);
+  }
+
+  @Get('search')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
+  search(@Query() searchDto: SearchInviteesDto) {
+    return this.inviteesService.search(searchDto.q, searchDto.eventId);
   }
 
   @Get('emails/list')
@@ -90,6 +97,21 @@ export class InviteesController {
     @Body() data: MarkAttendanceByDayDto,
   ) {
     return this.inviteesService.markAttendanceByDay(id, data);
+  }
+
+  /**
+   * Marca asistencia para múltiples días (batch operation)
+   * @param id - ID del invitado
+   * @param data - { days: Array<{ dayNumber, attended }>, notes?: string }
+   */
+  @Patch(':id/attendance/days')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
+  markAttendanceMultipleDays(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() data: MarkAttendanceBatchDto,
+  ) {
+    return this.inviteesService.markAttendanceMultipleDays(id, data);
   }
 
   /**

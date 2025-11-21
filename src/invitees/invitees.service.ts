@@ -88,8 +88,34 @@ export class InviteesService {
     const invitee = await this.prisma.invitee.findUnique({
       where: { id },
       include: {
-        Payment: true,
-        Order: true,
+        Payment: {
+          include: {
+            Order: {
+              include: {
+                Event: {
+                  select: {
+                    id: true,
+                    topic: true,
+                    eventDays: true,
+                    eventStartDate: true,
+                  }
+                }
+              }
+            }
+          }
+        },
+        Order: {
+          include: {
+            Event: {
+              select: {
+                id: true,
+                topic: true,
+                eventDays: true,
+                eventStartDate: true,
+              }
+            }
+          }
+        },
       },
     });
 
@@ -98,6 +124,60 @@ export class InviteesService {
     }
 
     return this.transformInviteeResponse(invitee);
+  }
+
+  async search(query: string, eventId?: string) {
+    const whereClause: any = {
+      deletedAt: null,
+      OR: [
+        { name: { contains: query, mode: 'insensitive' } },
+        { cuil: { contains: query, mode: 'insensitive' } },
+        {
+          AND: [
+            { email: { not: null } },
+            { email: { contains: query, mode: 'insensitive' } }
+          ]
+        },
+      ],
+    };
+
+    if (eventId) {
+      whereClause.Payment = {
+        Order: {
+          eventId: eventId,
+        },
+      };
+    }
+
+    const invitees = await this.prisma.invitee.findMany({
+      where: whereClause,
+      include: {
+        Payment: {
+          select: {
+            id: true,
+            amount: true,
+            payerEmail: true,
+            Order: {
+              select: {
+                id: true,
+                eventId: true,
+                Event: {
+                  select: {
+                    id: true,
+                    eventDays: true,
+                    eventStartDate: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      take: 20,
+      orderBy: { name: 'asc' },
+    });
+
+    return invitees.map(invitee => this.transformInviteeResponse(invitee));
   }
 
   async create(data: CreateInviteeDto) {
@@ -132,42 +212,25 @@ export class InviteesService {
     });
   }
   /**
-   * Marca asistencia de un invitado para un día específico (sistema dinámico)
-   * @param id - ID del invitado
-   * @param data - { dayNumber: number, attended: boolean, notes?: string }
+   * Marca asistencia de un invitado para un día específico
    */
   async markAttendanceByDay(
     id: string,
     data: { dayNumber: number; attended: boolean; notes?: string }
   ) {
-    // Buscar invitee con el evento asociado
     const invitee = await this.prisma.invitee.findUnique({
       where: { id },
       include: {
         Order: {
           include: {
-            Event: {
-              select: {
-                id: true,
-                eventStartDate: true,
-                eventEndDate: true,
-                eventDays: true
-              }
-            }
+            Event: { select: { eventStartDate: true, eventDays: true } }
           }
         },
         Payment: {
           include: {
             Order: {
               include: {
-                Event: {
-                  select: {
-                    id: true,
-                    eventStartDate: true,
-                    eventEndDate: true,
-                    eventDays: true
-                  }
-                }
+                Event: { select: { eventStartDate: true, eventDays: true } }
               }
             }
           }
@@ -179,77 +242,137 @@ export class InviteesService {
       throw new NotFoundException('Invitee not found or deleted');
     }
 
-    // Obtener evento desde Order o Payment->Order
     const event = invitee.Order?.Event || invitee.Payment?.Order?.Event;
-
     if (!event) {
       throw new BadRequestException('No event associated with this invitee');
     }
 
-    // Validar que el evento tenga días configurados
     const eventDays = (event.eventDays as any);
-
-    if (!eventDays || !eventDays.days || eventDays.days.length === 0) {
-      throw new BadRequestException('Event has no days configured. Please set event start and end dates.');
+    if (!eventDays || typeof eventDays !== 'object') {
+      throw new BadRequestException('Event has no days configured');
     }
 
-    // Validar que el dayNumber esté en el rango válido
-    const validDayNumbers = eventDays.days.map((d: any) => d.dayNumber);
-    const totalDays = eventDays.totalDays || eventDays.days.length;
-
-    if (!validDayNumbers.includes(data.dayNumber)) {
-      throw new BadRequestException(
-        `Invalid day number. Event has ${totalDays} day(s). Valid days: ${validDayNumbers.join(', ')}`
-      );
-    }
-
-    // Calcular la fecha real del día (eventStartDate + dayNumber - 1)
     if (!event.eventStartDate) {
       throw new BadRequestException('Event has no start date configured');
     }
 
-    const eventStartDate = new Date(event.eventStartDate);
-    const eventDate = new Date(eventStartDate);
+    // Calcular fecha del día
+    const eventDate = new Date(event.eventStartDate);
     eventDate.setDate(eventDate.getDate() + (data.dayNumber - 1));
-    const eventDateString = eventDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
-    // Obtener el label del día desde eventDays
-    const dayInfo = eventDays.days.find((d: any) => d.dayNumber === data.dayNumber);
-    const dayLabel = dayInfo?.label || `Día ${data.dayNumber}`;
-
-    // Obtener attendance actual o crear estructura nueva
     const currentAttendance = (invitee.attendance as any) || { days: {} };
-
-    // Actualizar el día específico con metadata calculada
+    if (!currentAttendance.days) {
+      currentAttendance.days = {};
+    }
     currentAttendance.days[data.dayNumber.toString()] = {
       attended: data.attended,
       timestamp: new Date().toISOString(),
       ...(data.notes && { notes: data.notes }),
       metadata: {
-        eventDate: eventDateString,
-        dayLabel: dayLabel
+        eventDate: eventDate.toISOString().split('T')[0],
+        dayLabel: `Día ${data.dayNumber}`
       }
     };
 
-    // Validar con Zod antes de guardar
     try {
       AttendanceSchema.parse(currentAttendance);
     } catch (error) {
       if (error instanceof ZodError) {
         throw new BadRequestException({
-          message: 'Invalid attendance data structure',
+          message: 'Invalid attendance data',
           errors: error.issues
         });
       }
       throw error;
     }
 
-    // Actualizar con el nuevo sistema de asistencia
     return this.prisma.invitee.update({
       where: { id },
-      data: {
-        attendance: currentAttendance
-      },
+      data: { attendance: currentAttendance },
+    });
+  }
+
+  /**
+   * Marca asistencia para múltiples días en una sola operación (batch)
+   */
+  async markAttendanceMultipleDays(
+    id: string,
+    data: { days: Array<{ dayNumber: number; attended: boolean }>; notes?: string }
+  ) {
+    const invitee = await this.prisma.invitee.findUnique({
+      where: { id },
+      include: {
+        Order: {
+          include: {
+            Event: { select: { eventStartDate: true, eventDays: true } }
+          }
+        },
+        Payment: {
+          include: {
+            Order: {
+              include: {
+                Event: { select: { eventStartDate: true, eventDays: true } }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!invitee || invitee.deletedAt) {
+      throw new NotFoundException('Invitee not found or deleted');
+    }
+
+    const event = invitee.Order?.Event || invitee.Payment?.Order?.Event;
+    if (!event) {
+      throw new BadRequestException('No event associated with this invitee');
+    }
+
+    const eventDays = (event.eventDays as any);
+    if (!eventDays || typeof eventDays !== 'object') {
+      throw new BadRequestException('Event has no days configured');
+    }
+
+    if (!event.eventStartDate) {
+      throw new BadRequestException('Event has no start date configured');
+    }
+
+    const currentAttendance = (invitee.attendance as any) || { days: {} };
+    if (!currentAttendance.days) {
+      currentAttendance.days = {};
+    }
+
+    // Actualizar todos los días en memoria
+    for (const day of data.days) {
+      const eventDate = new Date(event.eventStartDate);
+      eventDate.setDate(eventDate.getDate() + (day.dayNumber - 1));
+
+      currentAttendance.days[day.dayNumber.toString()] = {
+        attended: day.attended,
+        timestamp: new Date().toISOString(),
+        ...(data.notes && { notes: data.notes }),
+        metadata: {
+          eventDate: eventDate.toISOString().split('T')[0],
+          dayLabel: `Día ${day.dayNumber}`
+        }
+      };
+    }
+
+    try {
+      AttendanceSchema.parse(currentAttendance);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException({
+          message: 'Invalid attendance data',
+          errors: error.issues
+        });
+      }
+      throw error;
+    }
+
+    return this.prisma.invitee.update({
+      where: { id },
+      data: { attendance: currentAttendance },
     });
   }
 

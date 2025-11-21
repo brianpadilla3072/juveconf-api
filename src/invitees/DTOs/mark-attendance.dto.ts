@@ -1,24 +1,16 @@
 /* eslint-disable prettier/prettier */
-import { IsInt, IsBoolean, IsOptional, IsString, Min } from 'class-validator';
+import { IsInt, IsBoolean, IsOptional, IsString, Min, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
-/**
- * DTO DEPRECADO: Mantener temporalmente para retrocompatibilidad
- * Usar MarkAttendanceByDayDto para el nuevo sistema dinámico
- */
-export class MarkAttendanceDto {
-  @IsOptional()
-  @IsBoolean()
-  day1?: boolean;
+class DayAttendanceDto {
+  @IsInt()
+  @Min(1)
+  dayNumber: number;
 
-  @IsOptional()
   @IsBoolean()
-  day2?: boolean;
+  attended: boolean;
 }
 
-/**
- * DTO para marcar asistencia por número de día
- * Usa el nuevo sistema dinámico de días
- */
 export class MarkAttendanceByDayDto {
   @IsInt()
   @Min(1)
@@ -26,6 +18,17 @@ export class MarkAttendanceByDayDto {
 
   @IsBoolean()
   attended: boolean;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class MarkAttendanceBatchDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DayAttendanceDto)
+  days: DayAttendanceDto[];
 
   @IsOptional()
   @IsString()
