@@ -129,14 +129,25 @@ export class EventService {
     // Si se proporcionan eventStartDate y eventEndDate, generar automáticamente eventDays
     let eventDays: any = null;
 
+    // Validar que si se proporciona una fecha, la otra también debe proporcionarse
+    if ((data.eventStartDate && !data.eventEndDate) || (!data.eventStartDate && data.eventEndDate)) {
+      throw new BadRequestException(
+        'Both eventStartDate and eventEndDate are required to configure event days'
+      );
+    }
+
     if (data.eventStartDate && data.eventEndDate) {
       const startDate = new Date(data.eventStartDate);
       const endDate = new Date(data.eventEndDate);
 
       // Validar que la fecha de fin sea posterior o igual a la de inicio
-      if (endDate >= startDate) {
-        eventDays = this.generateEventDays(startDate, endDate);
+      if (endDate < startDate) {
+        throw new BadRequestException(
+          'Event end date must be greater than or equal to start date'
+        );
       }
+
+      eventDays = this.generateEventDays(startDate, endDate);
     }
 
     // Convertir strings de fecha a objetos Date
@@ -182,10 +193,22 @@ export class EventService {
         ? new Date(data.eventEndDate)
         : currentEvent?.eventEndDate ? new Date(currentEvent.eventEndDate) : null;
 
-      // Si tenemos ambas fechas, generar días
-      if (startDate && endDate && endDate >= startDate) {
-        eventDays = this.generateEventDays(startDate, endDate) as any;
+      // Validar que tenemos ambas fechas
+      if (!startDate || !endDate) {
+        throw new BadRequestException(
+          'Both eventStartDate and eventEndDate are required to configure event days'
+        );
       }
+
+      // Validar que la fecha de fin sea posterior o igual a la de inicio
+      if (endDate < startDate) {
+        throw new BadRequestException(
+          'Event end date must be greater than or equal to start date'
+        );
+      }
+
+      // Generar días del evento
+      eventDays = this.generateEventDays(startDate, endDate) as any;
     }
 
     // Convertir strings de fecha a objetos Date

@@ -13,6 +13,21 @@ export class EmailQueueProcessor {
     private mailService: MailService,
   ) {}
 
+  /**
+   * Normaliza nombres de templates para manejar legacy data
+   * Mapea nombres de enum (TICKET_DOWNLOAD) a nombres de archivo (ticket-details)
+   */
+  private normalizeTemplateName(templateName: string): string {
+    const templateMap: Record<string, string> = {
+      'TICKET_DOWNLOAD': 'ticket-details',
+      'PASSWORD_RESET': 'reset-password',
+      'ORDEN_TRANSFER': 'order-pending',
+      'ORDEN_CASH': 'order-pending',
+    };
+
+    return templateMap[templateName] || templateName;
+  }
+
   @Cron('0,30 * * * *') // Every 30 minutes (at minute 0 and 30)
   async processEmailQueue() {
     try {
@@ -30,9 +45,18 @@ export class EmailQueueProcessor {
         try {
           // Check if email uses template or raw HTML
           if (email.template && email.context) {
+            // Normalizar nombre del template para manejar legacy data
+            const normalizedTemplate = this.normalizeTemplateName(email.template);
+
+            if (normalizedTemplate !== email.template) {
+              this.logger.warn(
+                `Template name normalized: "${email.template}" -> "${normalizedTemplate}" for email ${email.id}`
+              );
+            }
+
             // Use template-based email
             await this.mailService.sendTemplate(
-              email.template,
+              normalizedTemplate,
               [email.to],
               email.context as Record<string, any>,
               email.subject,

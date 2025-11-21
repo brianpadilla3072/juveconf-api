@@ -140,20 +140,95 @@ export class InviteesService {
     id: string,
     data: { dayNumber: number; attended: boolean; notes?: string }
   ) {
-    const invitee = await this.prisma.invitee.findUnique({ where: { id } });
+    // Buscar invitee con el evento asociado
+    const invitee = await this.prisma.invitee.findUnique({
+      where: { id },
+      include: {
+        Order: {
+          include: {
+            Event: {
+              select: {
+                id: true,
+                eventStartDate: true,
+                eventEndDate: true,
+                eventDays: true
+              }
+            }
+          }
+        },
+        Payment: {
+          include: {
+            Order: {
+              include: {
+                Event: {
+                  select: {
+                    id: true,
+                    eventStartDate: true,
+                    eventEndDate: true,
+                    eventDays: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
 
     if (!invitee || invitee.deletedAt) {
       throw new NotFoundException('Invitee not found or deleted');
     }
 
+    // Obtener evento desde Order o Payment->Order
+    const event = invitee.Order?.Event || invitee.Payment?.Order?.Event;
+
+    if (!event) {
+      throw new BadRequestException('No event associated with this invitee');
+    }
+
+    // Validar que el evento tenga días configurados
+    const eventDays = (event.eventDays as any);
+
+    if (!eventDays || !eventDays.days || eventDays.days.length === 0) {
+      throw new BadRequestException('Event has no days configured. Please set event start and end dates.');
+    }
+
+    // Validar que el dayNumber esté en el rango válido
+    const validDayNumbers = eventDays.days.map((d: any) => d.dayNumber);
+    const totalDays = eventDays.totalDays || eventDays.days.length;
+
+    if (!validDayNumbers.includes(data.dayNumber)) {
+      throw new BadRequestException(
+        `Invalid day number. Event has ${totalDays} day(s). Valid days: ${validDayNumbers.join(', ')}`
+      );
+    }
+
+    // Calcular la fecha real del día (eventStartDate + dayNumber - 1)
+    if (!event.eventStartDate) {
+      throw new BadRequestException('Event has no start date configured');
+    }
+
+    const eventStartDate = new Date(event.eventStartDate);
+    const eventDate = new Date(eventStartDate);
+    eventDate.setDate(eventDate.getDate() + (data.dayNumber - 1));
+    const eventDateString = eventDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // Obtener el label del día desde eventDays
+    const dayInfo = eventDays.days.find((d: any) => d.dayNumber === data.dayNumber);
+    const dayLabel = dayInfo?.label || `Día ${data.dayNumber}`;
+
     // Obtener attendance actual o crear estructura nueva
     const currentAttendance = (invitee.attendance as any) || { days: {} };
 
-    // Actualizar el día específico
+    // Actualizar el día específico con metadata calculada
     currentAttendance.days[data.dayNumber.toString()] = {
       attended: data.attended,
       timestamp: new Date().toISOString(),
-      ...(data.notes && { notes: data.notes })
+      ...(data.notes && { notes: data.notes }),
+      metadata: {
+        eventDate: eventDateString,
+        dayLabel: dayLabel
+      }
     };
 
     // Validar con Zod antes de guardar

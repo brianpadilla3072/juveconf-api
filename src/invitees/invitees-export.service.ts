@@ -46,6 +46,33 @@ export class InviteesExportService {
   }
 
   /**
+   * Obtiene los números de días que asistió un invitee
+   */
+  private getAttendedDays(attendance: any): string {
+    try {
+      if (!attendance || !attendance.days) {
+        return '';
+      }
+
+      const attendedDays: number[] = [];
+
+      // Recorrer todos los días en attendance.days
+      for (const [dayNum, dayData] of Object.entries(attendance.days)) {
+        if (dayData && typeof dayData === 'object' && (dayData as any).attended === true) {
+          attendedDays.push(parseInt(dayNum));
+        }
+      }
+
+      // Ordenar y convertir a string separado por comas
+      return attendedDays.length > 0
+        ? attendedDays.sort((a, b) => a - b).join(', ')
+        : '';
+    } catch {
+      return '';
+    }
+  }
+
+  /**
    * Construye el esquema de exportación dinámicamente basado en los filtros
    */
   async buildExportSchema(filter: ExportFilterDto): Promise<ExportSchema> {
@@ -56,7 +83,6 @@ export class InviteesExportService {
       includeMetadata = true,
       selectedMetadataFields = [],
       selectedMerchTypes = [],
-      selectedDays = [],
     } = filter;
 
     // 1. Obtener evento para días
@@ -137,20 +163,16 @@ export class InviteesExportService {
         width: 12,
       })),
 
-      // Días dinámicos
+      // Días asistidos (columna única con números)
       ...(includeAttendance
-        ? eventDays
-            .filter((day) =>
-              selectedDays.length === 0
-                ? true
-                : selectedDays.includes(day.dayNumber),
-            )
-            .map((day) => ({
-              key: `attendance.${day.dayNumber}`,
-              label: day.label || `Día ${day.dayNumber}`,
-              type: 'boolean',
-              width: 10,
-            }))
+        ? [
+            {
+              key: 'attendedDays',
+              label: 'Días Asistidos',
+              type: 'string',
+              width: 15,
+            },
+          ]
         : []),
 
       // Columna de observaciones
@@ -222,9 +244,9 @@ export class InviteesExportService {
         } else if (col.key.startsWith('merch.')) {
           const merchType = col.key.replace('merch.', '');
           row[col.key] = metadata.merchandiseSizes?.[merchType] ?? '';
-        } else if (col.key.startsWith('attendance.')) {
-          const dayNum = col.key.replace('attendance.', '');
-          row[col.key] = attendance?.days?.[dayNum]?.attended ? 'Sí' : '';
+        } else if (col.key === 'attendedDays') {
+          // Calcular días asistidos usando helper
+          row[col.key] = this.getAttendedDays(attendance);
         } else if (col.key === 'email') {
           // Priorizar email de metadata sobre email directo
           row[col.key] = metadata.email || inv.email || '';

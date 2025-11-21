@@ -32,10 +32,6 @@ export class ExportFilterDto {
 
   @IsOptional()
   @IsArray()
-  selectedDays?: number[];
-
-  @IsOptional()
-  @IsArray()
   selectedAdditionalFields?: string[];
 }
 
