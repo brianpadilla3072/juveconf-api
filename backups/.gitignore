@@ -1,5 +1,4 @@
-# Ignorar todos los archivos de backup
-*
-
-# Excepto este archivo
-!.gitignore
+# Mantener archivos de backup en git
+!*.custom
+!*.sql
+!*.tar
