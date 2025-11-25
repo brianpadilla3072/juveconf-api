@@ -22,7 +22,13 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node prisma/seed.ts",
     "build:seed": "node dist/prisma/seed.js",
-    "build:studio": "npx prisma srudio --port 9000"
+    "build:studio": "npx prisma srudio --port 9000",
+    "backup:sql": "BACKUP_FORMAT=sql node scripts/backup-database.js",
+    "backup:custom": "BACKUP_FORMAT=custom node scripts/backup-database.js",
+    "backup:tar": "BACKUP_FORMAT=tar node scripts/backup-database.js",
+    "backup:dir": "BACKUP_FORMAT=directory node scripts/backup-database.js",
+    "backup": "npm run backup:custom",
+    "restore": "node scripts/restore-database.js"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
