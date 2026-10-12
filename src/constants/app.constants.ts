@@ -8,7 +8,7 @@ export const APP_CONFIG = {
   staticSiteUrl: process.env.STATIC_SITE_URL || "http://localhost:4321",
 
   // URL FIJA para emails (SIEMPRE producción, nunca localhost)
-  staticSiteUrlForEmails: "https://www.juveconfe.com",
+  staticSiteUrlForEmails: "https://juve.vidaeternaiglesia.com",
 
   email: {
     noreply: "equipo@juveconfe.com",
