@@ -20,6 +20,7 @@ model Combo {
   isActive          Boolean             @default(true)
   isFree            Boolean             @default(false)
   isPublished       Boolean             @default(false)
+  mealsEnabled      Boolean             @default(false)
   maxPersons        Int?
   metadata          Json?
   personsIncluded   Int
@@ -86,6 +87,8 @@ model Event {
   isActive       Boolean   @default(true)
   location       String?
   salesEndDate   DateTime?
+  mealConfig     Json?
+  registrationSeq Int      @default(0)
   Combo          Combo[]
   Order          Order[]
   PreSale        PreSale[]
@@ -123,8 +126,10 @@ model Invitee {
   phone      String?
   attendance Json?
   metadata   String?
+  registrationCode String? @unique
   Order      Order?    @relation(fields: [orderId], references: [id])
   Payment    Payment?  @relation(fields: [paymentId], references: [id])
+  MealSelection MealSelection[]
 
   @@index([cuil])
   @@index([email])
@@ -151,6 +156,7 @@ model Order {
   phone             String?
   comboId           String
   orderSnapshot     Json?
+  proofSent         Boolean      @default(false)
   EmailQueue        EmailQueue[]
   Invitee           Invitee[]
   Combo             Combo        @relation(fields: [comboId], references: [id])
@@ -292,5 +298,25 @@ enum UserRole {
   ADMIN
   EDITOR
   COLLABORATOR
+  BUFFET
   USER
+}
+
+model MealSelection {
+  id            String    @id @default(uuid())
+  inviteeId     String
+  orderId       String
+  slotCode      String
+  optionNumber  Int
+  optionName    String
+  price         Float
+  deliveredAt   DateTime?
+  deliveredById String?
+  createdAt     DateTime  @default(now())
+  Invitee       Invitee   @relation(fields: [inviteeId], references: [id])
+
+  @@unique([inviteeId, slotCode])
+  @@index([orderId])
+  @@index([slotCode, optionNumber])
+  @@index([slotCode, deliveredAt])
 }

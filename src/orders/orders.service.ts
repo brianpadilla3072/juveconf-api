@@ -16,6 +16,8 @@ import { JwtService } from 'src/jwt/jwt.service';
 import { MailService } from 'src/mail/mail.service';
 import { APP_CONFIG, COLORS } from 'src/constants/app.constants';
 import { EmailQueueService } from 'src/email-queue/email-queue.service';
+import { createMealSelections, nextRegistrationCode } from 'src/meals/meals-orders';
+import { MealsQuote } from 'src/meals/meals-pricing';
 
 @Injectable()
 export class OrdersService {
@@ -227,9 +229,31 @@ export class OrdersService {
     }
   }
 
+  // Reintenta las transacciones Serializable que fallan por conflicto (P2034)
+  private async withSerializableRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        if (error?.code === 'P2034' && attempt < attempts) continue;
+        throw error;
+      }
+    }
+  }
+
   async approveOrder(orderId: string): Promise<{success: boolean, data: Order}> {
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await this.withSerializableRetry(() => this.prisma.$transaction(async (tx) => {
+      // Ordenes con comidas: el desglose quedo en el snapshot al crearlas
+      const pre = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { status: true, orderSnapshot: true },
+      });
+      const mealsSnapshot = (pre?.orderSnapshot as any)?.meals as MealsQuote | undefined;
+      if (mealsSnapshot && pre?.status === OrderStatus.PAID) {
+        throw new BadRequestException('La orden ya fue aprobada');
+      }
+
       // 1. Actualizar el estado de la orden
       const order = await tx.order.update({
         where: { id: orderId },
@@ -264,31 +288,46 @@ export class OrdersService {
 
       // 4. Crear invitados si existen
       if (metadataPayload.attendees?.length) {
-        await Promise.all(
-          metadataPayload.attendees.map(attendee => {
-            // Parsear metadata si existe
-            let parsedMetadata: any = {};
-            if (attendee.metadata) {
-              try {
-                parsedMetadata = JSON.parse(attendee.metadata);
-              } catch (error) {
-                this.logger.warn(`Error parsing metadata for attendee ${attendee.name}: ${error.message}`);
-              }
+        const inviteeData = (attendee: (typeof metadataPayload.attendees)[number]) => {
+          // Parsear metadata si existe
+          let parsedMetadata: any = {};
+          if (attendee.metadata) {
+            try {
+              parsedMetadata = JSON.parse(attendee.metadata);
+            } catch (error) {
+              this.logger.warn(`Error parsing metadata for attendee ${attendee.name}: ${error.message}`);
             }
+          }
 
-            return tx.invitee.create({
-              data: {
-                name: attendee.name,
-                cuil: attendee.cuil,
-                email: parsedMetadata.email || undefined,
-                phone: parsedMetadata.phone || undefined,
-                metadata: attendee.metadata || undefined, // Guardar metadata completa como JSON string
-                orderId: order.id,
-                paymentId: payment.id,
-              }
+          return {
+            name: attendee.name,
+            cuil: attendee.cuil,
+            email: parsedMetadata.email || undefined,
+            phone: parsedMetadata.phone || undefined,
+            metadata: attendee.metadata || undefined, // Guardar metadata completa como JSON string
+            orderId: order.id,
+            paymentId: payment.id,
+          };
+        };
+
+        if (mealsSnapshot) {
+          // Modo comidas: en secuencia, cada invitado recibe su codigo de inscripcion y sus comidas
+          for (const [index, attendee] of metadataPayload.attendees.entries()) {
+            const registrationCode = await nextRegistrationCode(tx, order.eventId);
+            const invitee = await tx.invitee.create({
+              data: { ...inviteeData(attendee), registrationCode },
             });
-          })
-        );
+            await createMealSelections(tx, {
+              inviteeId: invitee.id,
+              orderId: order.id,
+              picks: mealsSnapshot.perAttendee[index]?.picks ?? [],
+            });
+          }
+        } else {
+          await Promise.all(
+            metadataPayload.attendees.map(attendee => tx.invitee.create({ data: inviteeData(attendee) }))
+          );
+        }
       }
 
       return { success: true, data: order, payment };
@@ -296,13 +335,13 @@ export class OrdersService {
       maxWait: 5000,
       timeout: 10000,
       isolationLevel: 'Serializable'
-    });
+    }));
 
     // 5. Enqueue email OUTSIDE transaction (after commit)
     try {
       await this.emailQueueService.enqueueTemplateEmail({
         to: result.data.email,
-        subject: 'Tu entrada - JUVECONF 2025',
+        subject: `Tu entrada - JUVECONF ${result.data.year}`,
         template: 'ticket-details',
         context: {
           paymentId: result.payment.id,

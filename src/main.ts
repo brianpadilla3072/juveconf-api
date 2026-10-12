@@ -34,7 +34,11 @@ async function bootstrap() {
       'http://juveconfe.com',
       'https://juveconfe.com',
       'http://www.juveconfe.com',
-      'https://www.juveconfe.com'
+      'https://www.juveconfe.com',
+      'https://app-juveconfe.vidaeternaiglesia.com',
+      'https://juveconfe.vidaeternaiglesia.com',
+      'https://juveconf-web-app.padillabrian830.workers.dev',
+      'https://juveconf.pages.dev'
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],

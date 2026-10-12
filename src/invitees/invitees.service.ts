@@ -7,6 +7,7 @@ import { FilterInviteesDto, CreateInviteeDto, UpdateInviteeDto } from './DTOs';
 import { AttendanceSchema } from './schemas/attendance.schema';
 import { ZodError } from 'zod';
 import * as jwt from 'jsonwebtoken';
+import { normalizeRegistrationCode } from 'src/meals/meals-orders';
 
 @Injectable()
 export class InviteesService {
@@ -127,9 +128,11 @@ export class InviteesService {
   }
 
   async search(query: string, eventId?: string) {
+    const registrationCode = normalizeRegistrationCode(query);
     const whereClause: any = {
       deletedAt: null,
       OR: [
+        ...(registrationCode ? [{ registrationCode }] : []),
         { name: { contains: query, mode: 'insensitive' } },
         { cuil: { contains: query, mode: 'insensitive' } },
         {
@@ -444,6 +447,11 @@ async getInviteesEmails(filter: FilterInviteesDto) {
         email: true,
         phone: true,
         paymentId: true,
+        registrationCode: true,
+        MealSelection: {
+          select: { slotCode: true, optionNumber: true, optionName: true },
+          orderBy: { slotCode: 'asc' }
+        },
         Order: {
           select: {
             eventId: true

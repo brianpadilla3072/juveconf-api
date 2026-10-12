@@ -1,7 +1,8 @@
 /* eslint-disable prettier/prettier */
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Combo } from '@prisma/client';
+import { parseMealConfig } from '../meals/meals-config.schema';
 import { CreateComboDto } from './DTOs/create-combo.dto';
 import { UpdateComboDto } from './DTOs/update-combo.dto';
 
@@ -75,9 +76,20 @@ export class CombosService {
       throw new NotFoundException('Evento no encontrado');
     }
 
+    if (dto.mealsEnabled) this.assertMealsConfigured(event.mealConfig);
+
     return this.prisma.combo.create({
       data: dto,
     });
+  }
+
+  // Un combo solo puede habilitar comidas si el evento ya tiene los menus configurados
+  private assertMealsConfigured(mealConfig: unknown) {
+    if (!parseMealConfig(mealConfig)) {
+      throw new BadRequestException(
+        'Configurá primero los menús y precios de comidas del evento (Comidas > Configuración).',
+      );
+    }
   }
 
   async findAll(): Promise<Combo[]> {
@@ -165,6 +177,14 @@ export class CombosService {
       if (conflictCombo) {
         throw new ConflictException(`Ya existe otro combo con el nombre "${dto.name || existingCombo.name}" para este evento`);
       }
+    }
+
+    if (dto.mealsEnabled) {
+      const event = await this.prisma.event.findUnique({
+        where: { id: dto.eventId || existingCombo.eventId },
+        select: { mealConfig: true },
+      });
+      this.assertMealsConfigured(event?.mealConfig);
     }
 
     return this.prisma.combo.update({

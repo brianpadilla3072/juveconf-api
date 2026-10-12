@@ -7,7 +7,7 @@ export class CreateComboDto {
   name: string;
 
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   price: number;
 
   @IsInt()
@@ -35,6 +35,11 @@ export class CreateComboDto {
   @IsOptional()
   @IsBoolean()
   isFree?: boolean;
+
+  // Permite elegir comidas al comprar este combo (requiere la configuracion de comidas del evento)
+  @IsOptional()
+  @IsBoolean()
+  mealsEnabled?: boolean;
 
   @IsOptional()
   @IsString()

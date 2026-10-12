@@ -4,7 +4,7 @@
  
  
 import { Injectable, Logger } from '@nestjs/common';
-import { Order, PaymentType, EmailType } from '@prisma/client';
+import { Order, PaymentType, EmailType, Prisma } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
 import { CustomError } from 'src/global/CustomError';
 import { JwtService } from 'src/jwt/jwt.service';
@@ -15,6 +15,7 @@ import { MailService } from 'src/mail/mail.service';
 import { CombosService } from 'src/combos/combos.service';
 import { APP_CONFIG, COLORS } from 'src/constants/app.constants';
 import { EmailQueueService } from 'src/email-queue/email-queue.service';
+import { assertNoMeals, prepareMealsForOrder } from 'src/meals/meals-orders';
 
 @Injectable()
 export class TransfersService {
@@ -99,13 +100,18 @@ export class TransfersService {
         );
       }
     }
+    // Comidas: solo si el combo las tiene activadas (con el combo sin comidas devuelve null)
+    const mealsQuote = await prepareMealsForOrder(this.prisma, { eventId: combo.eventId, mealsEnabled: combo.mealsEnabled }, dto.attendees ?? []);
+
     let email:string ="";
+    let createdTotal = 0;
     let createdOrder: Order | null = null;    // 3) Crear orden dentro de transacción
     try {
       await this.prisma.$transaction(async (tx) => {
         // Get current price with presales
         const currentPrice = await this.combosService.getCurrentPrice(combo.id);
-        const totalAmount = currentPrice.price * dto.quantity;
+        const totalAmount = currentPrice.price * dto.quantity + (mealsQuote?.mealsTotal ?? 0);
+        createdTotal = totalAmount;
         console.log('[createTransferOrder] Total calculado:', totalAmount);
 
         // Create order snapshot
@@ -125,6 +131,7 @@ export class TransfersService {
           } : null,
           timestamp: new Date().toISOString(),
           quantity: dto.quantity,
+          ...(mealsQuote ? { meals: mealsQuote as unknown as Prisma.InputJsonValue } : {}),
         };
 
         const order = await tx.order.create({
@@ -180,11 +187,11 @@ export class TransfersService {
 
     await this.emailQueueService.enqueueTemplateEmail({
       to: email,
-      subject: 'Orden Creada - JUVECONF 2025',
+      subject: `Orden Creada - JUVECONF ${createdOrder!.year}`,
       template: 'order-pending',
       context: {
         orderId: createdOrder!.id,
-        amount: currentPrice.price,
+        amount: mealsQuote ? createdTotal : currentPrice.price,
       },
       emailType: EmailType.ORDEN_TRANSFER,
       orderId: createdOrder!.id,
@@ -196,6 +203,7 @@ export class TransfersService {
 
   // crea una orden para pagos en efectivo
   async createCashOrder(dto: CreatePreferenceDto): Promise<{ success: true, orderID: string | null }> {
+    assertNoMeals(dto.attendees);
     console.log('[createCashOrder] Inicio con DTO:', dto);
 
     // 1) Obtener combo
@@ -353,6 +361,7 @@ export class TransfersService {
 
   // Crea una orden de pago en efectivo SIN enviar email (versión simple)
   async createCashOrderSimple(dto: CreatePreferenceDto): Promise<{ success: true, orderID: string | null }> {
+    assertNoMeals(dto.attendees);
     console.log('[createCashOrderSimple] Inicio con DTO:', dto);
 
     // 1) Obtener combo

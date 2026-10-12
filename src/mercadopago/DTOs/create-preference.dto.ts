@@ -1,6 +1,17 @@
 /* eslint-disable prettier/prettier */
-import { IsString, IsEmail, IsNumber, IsArray, IsOptional, ValidateNested, Matches } from 'class-validator';
+import { IsString, IsEmail, IsNumber, IsArray, IsOptional, ValidateNested, Matches, IsInt, Min, Max, ArrayMaxSize } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class MealPickDto {
+  @IsString()
+  @Matches(/^[A-Z][A-Z0-9_]{1,19}$/)
+  slotCode: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(9)
+  optionNumber: number;
+}
 
 export class AttendeeDto {
   @IsString()
@@ -13,6 +24,14 @@ export class AttendeeDto {
   @IsOptional()
   @IsString()
   metadata?: string; // JSON string con: { email?, phone?, birthdate?, city?, church? }
+
+  // Comidas elegidas (solo si el evento tiene comidas activadas)
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ValidateNested({ each: true })
+  @Type(() => MealPickDto)
+  meals?: MealPickDto[];
 }
 
 export class CreatePreferenceDto {

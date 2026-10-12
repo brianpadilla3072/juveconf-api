@@ -24,6 +24,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { FinanzasModule } from './finanzas/finanzas.module';
 import { PresalesModule } from './presales/presales.module';
 import { EmailQueueModule } from './email-queue/email-queue.module';
+import { MealsModule } from './meals/meals.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { EmailQueueModule } from './email-queue/email-queue.module';
     FinanzasModule,
     PresalesModule,
     EmailQueueModule,
+    MealsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

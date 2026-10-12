@@ -17,6 +17,7 @@ import { OrderStatus } from 'src/orders/orders.service';
 import { PaymentType, EmailType } from '@prisma/client';
 import { AttendeeDto, CreatePreferenceDto } from './DTOs/create-preference.dto';
 import { CustomError } from 'src/global/CustomError';
+import { assertNoMeals } from 'src/meals/meals-orders';
 import { firstValueFrom } from 'rxjs';
 import { APP_CONFIG, COLORS } from 'src/constants/app.constants';
 import { MailService } from 'src/mail/mail.service';
@@ -55,6 +56,7 @@ export class MercadopagoService {
   }
   // Crea el link de pago y la orden en pending
   async createPreference(dto: CreatePreferenceDto): Promise<string> {
+    assertNoMeals(dto.attendees);
     // 1) Obtener combo y payload para validaciones
     const combo = await this.combosService.findOne(dto.id);
     if (!combo) throw new CustomError(404, 'Combo no encontrado', 'No pudimos encontrar el combo solicitado.');

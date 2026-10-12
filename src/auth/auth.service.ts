@@ -11,7 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RegisterUserDto } from './DTOs/register-user.dto';
 import { ChangePasswordDto } from './DTOs/change-password.dto';
 import { EmailQueueService } from '../email-queue/email-queue.service';
-import { EmailType } from '@prisma/client';
+import { EmailType, UserRole } from '@prisma/client';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -101,6 +101,7 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         ...registerUserDto,
+        role: UserRole.USER, // el registro publico nunca puede elegir rol
         password: hashedPassword,
         provider: 'LOCAL',
         emailVerified: false, // Podrías querer enviar un correo de verificación
