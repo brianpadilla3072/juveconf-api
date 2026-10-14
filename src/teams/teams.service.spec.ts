@@ -32,6 +32,12 @@ describe('TeamsService.createTeam', () => {
     expect(tx.team.create.mock.calls[0][0].data.TeamPlayer.create).toHaveLength(2);
   });
 
+  it('acepta equipos sin datos del lider (quedan en null)', async () => {
+    const { service, tx } = serviceWith();
+    await service.createTeam(dto({ leaderName: undefined, leaderPhone: undefined }));
+    expect(tx.team.create.mock.calls[0][0].data).toMatchObject({ leaderName: null, leaderPhone: null, leaderEmail: null });
+  });
+
   it('409 cuando el tipo alcanzo maxTeams', async () => {
     const { service, tx } = serviceWith({ count: 2 });
     await expect(service.createTeam(dto())).rejects.toThrow(ConflictException);

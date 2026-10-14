@@ -46,8 +46,8 @@ export class TeamsService {
           data: {
             teamTypeId: type.id,
             name,
-            leaderName: cleanText(dto.leaderName),
-            leaderPhone: cleanText(dto.leaderPhone),
+            leaderName: dto.leaderName ? cleanText(dto.leaderName) : null,
+            leaderPhone: dto.leaderPhone ? cleanText(dto.leaderPhone) : null,
             leaderEmail: dto.leaderEmail?.trim() || null,
             TeamPlayer: { create: players.map((p) => ({ firstName: p.firstName, lastName: p.lastName })) },
           },
@@ -247,7 +247,7 @@ export class TeamsService {
   }
 
   private toTeamView(team: {
-    id: string; name: string; leaderName: string; leaderPhone: string; leaderEmail?: string | null;
+    id: string; name: string; leaderName: string | null; leaderPhone: string | null; leaderEmail?: string | null;
     TeamType: { id: string; name: string; minPlayers: number; maxPlayers: number };
     TeamPlayer: { id: string; firstName: string; lastName: string }[];
   }) {

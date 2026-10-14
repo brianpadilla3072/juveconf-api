@@ -40,15 +40,17 @@ export class CreateTeamDto {
   @MaxLength(60)
   name: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(2)
   @MaxLength(80)
-  leaderName: string;
+  leaderName?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(6)
   @MaxLength(30)
-  leaderPhone: string;
+  leaderPhone?: string;
 
   @IsOptional()
   @IsEmail()

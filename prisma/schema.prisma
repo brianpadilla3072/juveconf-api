@@ -352,8 +352,9 @@ model Team {
   id          String       @id @default(uuid())
   teamTypeId  String
   name        String
-  leaderName  String
-  leaderPhone String
+  // Datos del lider: opcionales (hoy el formulario publico no los pide)
+  leaderName  String?
+  leaderPhone String?
   leaderEmail String?
   // Link privado: permite al lider editar su equipo sin tener cuenta
   editToken   String       @unique @default(uuid())
