@@ -92,6 +92,7 @@ model Event {
   Combo          Combo[]
   Order          Order[]
   PreSale        PreSale[]
+  TeamType       TeamType[]
 
   @@index([eventStartDate])
   @@index([salesStartDate])
@@ -130,6 +131,7 @@ model Invitee {
   Order      Order?    @relation(fields: [orderId], references: [id])
   Payment    Payment?  @relation(fields: [paymentId], references: [id])
   MealSelection MealSelection[]
+  TeamPlayer TeamPlayer[]
 
   @@index([cuil])
   @@index([email])
@@ -319,4 +321,64 @@ model MealSelection {
   @@index([orderId])
   @@index([slotCode, optionNumber])
   @@index([slotCode, deliveredAt])
+}
+
+// Tipo de equipo/actividad configurable por evento (futbol femenino, voley masculino, jenga, juegos de mesa...)
+model TeamType {
+  id           String    @id @default(uuid())
+  eventId      String
+  name         String
+  description  String?
+  minPlayers   Int       @default(1)
+  maxPlayers   Int       @default(10)
+  // null = sin limite de equipos
+  maxTeams     Int?
+  // Precio de inscripcion del equipo; 0 = gratis (hoy no se cobra, queda para el futuro)
+  price        Float     @default(0)
+  isActive     Boolean   @default(true)
+  isPublished  Boolean   @default(false)
+  displayOrder Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  Event        Event     @relation(fields: [eventId], references: [id])
+  Team         Team[]
+
+  @@unique([eventId, name])
+  @@index([eventId, isActive])
+}
+
+model Team {
+  id          String       @id @default(uuid())
+  teamTypeId  String
+  name        String
+  leaderName  String
+  leaderPhone String
+  leaderEmail String?
+  // Link privado: permite al lider editar su equipo sin tener cuenta
+  editToken   String       @unique @default(uuid())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+  TeamType    TeamType     @relation(fields: [teamTypeId], references: [id])
+  TeamPlayer  TeamPlayer[]
+
+  @@unique([teamTypeId, name])
+  @@index([teamTypeId])
+}
+
+model TeamPlayer {
+  id        String   @id @default(uuid())
+  teamId    String
+  firstName String
+  lastName  String
+  // Vinculo opcional con una entrada (hoy siempre null)
+  inviteeId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  Invitee   Invitee? @relation(fields: [inviteeId], references: [id], onDelete: SetNull)
+
+  @@index([teamId])
+  @@index([inviteeId])
 }
