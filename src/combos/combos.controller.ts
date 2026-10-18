@@ -19,8 +19,11 @@ export class CombosController {
   }
 
   @Get()
-  findAll() {
-    return this.combosService.findAll();
+  findAll(
+    @Query('year') year?: string,
+    @Query('eventId') eventId?: string,
+  ) {
+    return this.combosService.findAll(year, eventId);
   }
 
   @Get('statistics')

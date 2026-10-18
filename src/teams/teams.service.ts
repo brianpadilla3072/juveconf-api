@@ -1,15 +1,29 @@
 /* eslint-disable prettier/prettier */
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { EmailType, OrderStatus, PaymentType, Prisma } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
-import { CreateTeamDto, CreateTeamTypeDto, PlayerDto, UpdateTeamDto, UpdateTeamTypeDto } from './dto/teams.dto';
+import { EmailQueueService } from 'src/email-queue/email-queue.service';
+import { JwtService } from 'src/jwt/jwt.service';
+import { CreateTeamDto, CreateTeamOrderDto, CreateTeamTypeDto, PlayerDto, UpdateTeamDto, UpdateTeamTypeDto } from './dto/teams.dto';
 import { assertPlayers, cleanText, normalizePlayers } from './teams-rules';
+import {
+  buildTeamOrderSnapshot,
+  countReservedTeams,
+  findPendingTeamOrderByName,
+  getOrCreateTeamCombo,
+} from './teams-orders';
 
 const PLAYER_SELECT = { id: true, firstName: true, lastName: true } as const;
 
 @Injectable()
 export class TeamsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(TeamsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+    private readonly emailQueueService: EmailQueueService,
+  ) {}
 
   // ---------------------------------------------------------------- publico
 
@@ -23,6 +37,101 @@ export class TeamsService {
     return types.map((t) => this.toPublicType(t));
   }
 
+  /**
+   * Inscripcion de equipo CON PAGO: no crea el equipo, crea una orden de transferencia con todos
+   * los datos en el snapshot. El equipo se crea recien cuando un admin aprueba el pago
+   * (ver OrdersService.approveOrder).
+   */
+  async createOrder(dto: CreateTeamOrderDto) {
+    const players = normalizePlayers(dto.players);
+    const name = cleanText(dto.name);
+    const leaderName = cleanText(dto.leaderName);
+    const leaderPhone = cleanText(dto.leaderPhone);
+    const leaderEmail = dto.leaderEmail.trim();
+
+    const order = await this.prisma.$transaction(async (tx) => {
+      // Bloquea el tipo para que dos inscripciones simultaneas no superen maxTeams
+      await tx.$queryRaw`SELECT id FROM "TeamType" WHERE id = ${dto.teamTypeId} FOR UPDATE`;
+      const type = await tx.teamType.findFirst({ where: { id: dto.teamTypeId, deletedAt: null } });
+      if (!type || !type.isActive || !type.isPublished) {
+        throw new NotFoundException('Ese tipo de equipo no esta disponible');
+      }
+      assertPlayers(type, players);
+
+      const combo = await getOrCreateTeamCombo(tx, type.eventId);
+
+      if (type.maxTeams !== null) {
+        const taken = await countReservedTeams(tx, type.id, combo.id);
+        if (taken >= type.maxTeams) {
+          throw new ConflictException(`Ya no quedan cupos para "${type.name}"`);
+        }
+      }
+      const existingName = await tx.team.findFirst({
+        where: { teamTypeId: type.id, name, deletedAt: null },
+        select: { id: true },
+      });
+      if (existingName || (await findPendingTeamOrderByName(tx, combo.id, type.id, name))) {
+        throw new ConflictException('Ya hay un equipo con ese nombre en esta categoria');
+      }
+
+      const created = await tx.order.create({
+        data: {
+          year: new Date().getFullYear(),
+          eventId: type.eventId,
+          total: type.price,
+          status: OrderStatus.REVIEW,
+          paymentType: PaymentType.TRANSFER,
+          comboId: combo.id,
+          email: leaderEmail,
+          cuil: dto.leaderCuil,
+          phone: leaderPhone,
+          orderSnapshot: {
+            team: buildTeamOrderSnapshot({
+              teamTypeId: type.id,
+              teamTypeName: type.name,
+              name,
+              leaderName,
+              leaderPhone,
+              leaderEmail,
+              players: players.map((p) => ({ firstName: p.firstName, lastName: p.lastName })),
+            }),
+          } as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      const metadataToken = this.jwtService.signMetadata({
+        orderId: created.id,
+        userId: null,
+        eventId: type.eventId,
+        comboId: combo.id,
+        quantity: 1,
+        email: leaderEmail,
+        phone: leaderPhone,
+        cuil: dto.leaderCuil,
+        totalAmount: type.price,
+        currency: 'ARS',
+        attendees: [],
+      });
+
+      return tx.order.update({ where: { id: created.id }, data: { metadataToken } });
+    });
+
+    try {
+      await this.emailQueueService.enqueueTemplateEmail({
+        to: order.email,
+        subject: `Orden Creada - JUVECONF ${order.year}`,
+        template: 'order-pending',
+        context: { orderId: order.id, amount: order.total },
+        emailType: EmailType.ORDEN_TRANSFER,
+        orderId: order.id,
+      });
+    } catch (error: any) {
+      this.logger.error(`No pudimos encolar el email de la orden ${order.id}: ${error?.message}`);
+    }
+
+    return { success: true, orderID: order.id };
+  }
+
   async createTeam(dto: CreateTeamDto) {
     const players = normalizePlayers(dto.players);
     const name = cleanText(dto.name);
@@ -34,6 +143,10 @@ export class TeamsService {
         const type = await tx.teamType.findFirst({ where: { id: dto.teamTypeId, deletedAt: null } });
         if (!type || !type.isActive || !type.isPublished) {
           throw new NotFoundException('Ese tipo de equipo no esta disponible');
+        }
+        // Los tipos con precio se inscriben con pago (POST /teams/public/order), no por aca
+        if (type.price > 0) {
+          throw new BadRequestException('Esta inscripcion requiere pago: completá el formulario para generar la orden');
         }
         assertPlayers(type, players);
         if (type.maxTeams !== null) {

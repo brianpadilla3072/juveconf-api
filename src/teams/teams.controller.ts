@@ -4,7 +4,7 @@ import { UserRole } from '@prisma/client';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { CreateTeamDto, CreateTeamTypeDto, EventQueryDto, TeamsQueryDto, UpdateTeamDto, UpdateTeamTypeDto } from './dto/teams.dto';
+import { CreateTeamDto, CreateTeamOrderDto, CreateTeamTypeDto, EventQueryDto, TeamsQueryDto, UpdateTeamDto, UpdateTeamTypeDto } from './dto/teams.dto';
 import { TeamsService } from './teams.service';
 
 const ADMIN_ROLES = [UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN];
@@ -23,6 +23,12 @@ export class TeamsController {
   @Post('public')
   create(@Body() dto: CreateTeamDto) {
     return this.teamsService.createTeam(dto);
+  }
+
+  /** Inscripcion con pago: crea una orden de transferencia (el equipo nace al aprobarse el pago). */
+  @Post('public/order')
+  createOrder(@Body() dto: CreateTeamOrderDto) {
+    return this.teamsService.createOrder(dto);
   }
 
   @Get('public/:id')

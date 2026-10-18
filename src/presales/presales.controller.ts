@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { PresalesService } from './presales.service';
 import { CreatePreSaleDto } from './DTOs/create-presale.dto';
 import { UpdatePreSaleDto } from './DTOs/update-presale.dto';
@@ -19,8 +19,11 @@ export class PresalesController {
   }
 
   @Get()
-  findAll() {
-    return this.presalesService.findAll();
+  findAll(
+    @Query('year') year?: string,
+    @Query('eventId') eventId?: string,
+  ) {
+    return this.presalesService.findAll(year, eventId);
   }
 
   @Get('active')

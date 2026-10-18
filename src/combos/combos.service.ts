@@ -92,13 +92,19 @@ export class CombosService {
     }
   }
 
-  async findAll(): Promise<Combo[]> {
+  async findAll(year?: string, eventId?: string): Promise<Combo[]> {
     const now = new Date();
+    const yearNumber = year ? Number(year) : undefined;
 
     return this.prisma.combo.findMany({
       where: {
         deletedAt: null,
         isActive: true,
+        ...(eventId
+          ? { eventId }
+          : yearNumber && !Number.isNaN(yearNumber)
+            ? { Event: { year: yearNumber } }
+            : {}),
       },
       include: {
         Event: {
@@ -249,7 +255,15 @@ export class CombosService {
       where: {
         eventId,
         isPublished: true,
+        isActive: true,
         deletedAt: null,
+        Event: {
+          deletedAt: null,
+          isActive: true,
+          // Si el evento ya terminó (eventEndDate en el pasado), no se publican sus combos
+          // aunque sigan marcados como isPublished/isActive.
+          OR: [{ eventEndDate: null }, { eventEndDate: { gte: now } }],
+        },
       },
       include: {
         Event: {

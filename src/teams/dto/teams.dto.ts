@@ -10,6 +10,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -56,6 +57,44 @@ export class CreateTeamDto {
   @IsEmail()
   @MaxLength(120)
   leaderEmail?: string;
+
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => PlayerDto)
+  players: PlayerDto[];
+}
+
+/**
+ * Inscripcion de equipo con pago: el equipo todavia NO se crea, se crea una orden de transferencia.
+ * El email y el CUIL del lider son obligatorios porque la orden los necesita.
+ */
+export class CreateTeamOrderDto {
+  @IsUUID()
+  teamTypeId: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(60)
+  name: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  leaderName: string;
+
+  @IsString()
+  @Matches(/^\d{7,11}$/)
+  leaderCuil: string;
+
+  @IsEmail()
+  @MaxLength(120)
+  leaderEmail: string;
+
+  @IsString()
+  @MinLength(6)
+  @MaxLength(30)
+  leaderPhone: string;
 
   @IsArray()
   @ArrayMaxSize(100)

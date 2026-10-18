@@ -32,9 +32,13 @@ export class PaymentsService {
     });
   }
 
-  async findAll() {
+  async findAll(year?: string) {
+    const yearNumber = year ? Number(year) : undefined;
     return this.prisma.payment.findMany({
-      where: { deletedAt: null },
+      where: {
+        deletedAt: null,
+        ...(yearNumber && !Number.isNaN(yearNumber) ? { year: yearNumber } : {}),
+      },
     });
   }
 

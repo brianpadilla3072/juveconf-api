@@ -9,6 +9,7 @@ import {
   NotFoundException, 
   Logger,
   Get, 
+  Query,
   UseGuards
 } from '@nestjs/common';
 import { OrdersService, OrderStatus } from './orders.service';
@@ -22,8 +23,11 @@ export class OrdersController {
     @Get('review')
     @UseGuards(JwtAuthGuard)
     @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN)
-    getOrdersByReview() {
-        return this.ordersService.getOrdersByStatus(OrderStatus.REVIEW);
+    getOrdersByReview(
+        @Query('year') year?: string,
+        @Query('eventId') eventId?: string,
+    ) {
+        return this.ordersService.getOrdersByStatus(OrderStatus.REVIEW, year, eventId);
     }
     @Get('pending')
     @UseGuards(JwtAuthGuard)
@@ -34,8 +38,11 @@ export class OrdersController {
     @UseGuards(JwtAuthGuard)
     @Roles(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN, UserRole.COLLABORATOR)
     @Get('paid')
-  getOrdersByPaid() {
-    return this.ordersService.getOrdersByStatus(OrderStatus.PAID);
+  getOrdersByPaid(
+    @Query('year') year?: string,
+    @Query('eventId') eventId?: string,
+  ) {
+    return this.ordersService.getOrdersByStatus(OrderStatus.PAID, year, eventId);
   }
 
   private readonly logger = new Logger(OrdersController.name);

@@ -57,10 +57,16 @@ export class PresalesService {
     });
   }
 
-  async findAll() {
+  async findAll(year?: string, eventId?: string) {
+    const yearNumber = year ? Number(year) : undefined;
     return this.prisma.preSale.findMany({
       where: {
         deletedAt: null,
+        ...(eventId
+          ? { eventId }
+          : yearNumber && !Number.isNaN(yearNumber)
+            ? { Event: { year: yearNumber } }
+            : {}),
       },
       include: {
         Event: true,

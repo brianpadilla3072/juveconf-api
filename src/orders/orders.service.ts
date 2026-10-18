@@ -18,6 +18,7 @@ import { APP_CONFIG, COLORS } from 'src/constants/app.constants';
 import { EmailQueueService } from 'src/email-queue/email-queue.service';
 import { createMealSelections, nextRegistrationCode } from 'src/meals/meals-orders';
 import { MealsQuote } from 'src/meals/meals-pricing';
+import { createTeamFromSnapshot, readTeamOrderSnapshot, teamConfirmedHtml } from 'src/teams/teams-orders';
 
 @Injectable()
 export class OrdersService {
@@ -140,11 +141,17 @@ export class OrdersService {
 
     return filteredOrders;  // Retornar las órdenes filtradas
   }
-  async getOrdersByStatus(status: OrderStatus) {
+  async getOrdersByStatus(status: OrderStatus, year?: string, eventId?: string) {
+    const yearNumber = year ? Number(year) : undefined;
     const orders = await this.prisma.order.findMany({
       where: {
         status,
-        deletedAt: null
+        deletedAt: null,
+        ...(eventId
+          ? { eventId }
+          : yearNumber && !Number.isNaN(yearNumber)
+            ? { year: yearNumber }
+            : {}),
       },
       include: {
         User: true,
@@ -250,7 +257,9 @@ export class OrdersService {
         select: { status: true, orderSnapshot: true },
       });
       const mealsSnapshot = (pre?.orderSnapshot as any)?.meals as MealsQuote | undefined;
-      if (mealsSnapshot && pre?.status === OrderStatus.PAID) {
+      // Ordenes de equipo: los datos del equipo quedaron en el snapshot al crearlas
+      const teamSnapshot = readTeamOrderSnapshot(pre?.orderSnapshot);
+      if ((mealsSnapshot || teamSnapshot) && pre?.status === OrderStatus.PAID) {
         throw new BadRequestException('La orden ya fue aprobada');
       }
 
@@ -285,6 +294,9 @@ export class OrdersService {
           payerPhone: metadataPayload.phone || undefined,
         }
       });
+
+      // 3.b Inscripcion de equipos: el equipo recien existe cuando el pago se aprueba
+      const team = teamSnapshot ? await createTeamFromSnapshot(tx, teamSnapshot) : null;
 
       // 4. Crear invitados si existen
       if (metadataPayload.attendees?.length) {
@@ -330,7 +342,7 @@ export class OrdersService {
         }
       }
 
-      return { success: true, data: order, payment };
+      return { success: true, data: order, payment, team };
     }, {
       maxWait: 5000,
       timeout: 10000,
@@ -339,19 +351,38 @@ export class OrdersService {
 
     // 5. Enqueue email OUTSIDE transaction (after commit)
     try {
-      await this.emailQueueService.enqueueTemplateEmail({
-        to: result.data.email,
-        subject: `Tu entrada - JUVECONF ${result.data.year}`,
-        template: 'ticket-details',
-        context: {
+      if (result.team) {
+        // Orden de equipo: le mandamos al lider el link privado para editar su equipo
+        const editUrl = `${APP_CONFIG.staticSiteUrlForEmails}/equipos?id=${result.team.id}&token=${result.team.editToken}`;
+        await this.emailQueueService.enqueueEmail({
+          to: result.data.email,
+          subject: `Tu equipo quedo inscripto - JUVECONF ${result.data.year}`,
+          html: teamConfirmedHtml({
+            teamName: result.team.name,
+            teamTypeName: result.team.TeamType?.name ?? '',
+            players: result.team.TeamPlayer ?? [],
+            editUrl,
+          }),
+          emailType: EmailType.CUSTOM,
+          orderId: result.data.id,
           paymentId: result.payment.id,
-          ticketUrl: `${APP_CONFIG.staticSiteUrlForEmails}/ticket/${result.payment.id}`,
-        },
-        emailType: EmailType.TICKET_DOWNLOAD,
-        orderId: result.data.id,
-        paymentId: result.payment.id,
-      });
-      this.logger.log(`Email encolado exitosamente para ${result.data.email}`);
+        });
+        this.logger.log(`Equipo ${result.team.id} creado y email encolado para ${result.data.email}`);
+      } else {
+        await this.emailQueueService.enqueueTemplateEmail({
+          to: result.data.email,
+          subject: `Tu entrada - JUVECONF ${result.data.year}`,
+          template: 'ticket-details',
+          context: {
+            paymentId: result.payment.id,
+            ticketUrl: `${APP_CONFIG.staticSiteUrlForEmails}/ticket/${result.payment.id}`,
+          },
+          emailType: EmailType.TICKET_DOWNLOAD,
+          orderId: result.data.id,
+          paymentId: result.payment.id,
+        });
+        this.logger.log(`Email encolado exitosamente para ${result.data.email}`);
+      }
     } catch (error: any) {
       this.logger.error(`Error al encolar email: ${error.message}`);
       // El email falló, pero la orden ya está aprobada

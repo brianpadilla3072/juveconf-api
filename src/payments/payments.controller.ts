@@ -17,8 +17,8 @@ export class PaymentsController {
   }
 
   @Get()
-  findAll() {
-    return this.paymentsService.findAll();
+  findAll(@Query('year') year?: string) {
+    return this.paymentsService.findAll(year);
   }
 
   // Dashboard endpoints
