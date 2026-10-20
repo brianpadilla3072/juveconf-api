@@ -10,7 +10,9 @@ import { MailerService } from '@nestjs-modules/mailer';
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly defaultFrom = '"JUVECONF" <equipo@juveconfe.com>';
+  // El remitente tiene que ser una direccion que la cuenta SMTP pueda usar:
+  // Zoho rechaza con "550 5.7.1 Sender is not allowed to relay emails" si el From no le pertenece.
+  private readonly defaultFrom = `"JUVECONF" <${process.env.MAIL_FROM || process.env.MAIL_USER || 'equipo@juveconfe.com'}>`;
 
   constructor(private readonly mailer: MailerService) {}
 
