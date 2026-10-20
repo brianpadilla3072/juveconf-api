@@ -119,7 +119,7 @@ export class TeamsService {
     try {
       await this.emailQueueService.enqueueTemplateEmail({
         to: order.email,
-        subject: `Orden Creada - JUVECONF ${order.year}`,
+        subject: `Orden Creada - JUVECONFE ${order.year}`,
         template: 'order-pending',
         context: { orderId: order.id, amount: order.total },
         emailType: EmailType.ORDEN_TRANSFER,

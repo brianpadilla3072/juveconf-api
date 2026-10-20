@@ -187,7 +187,7 @@ export class TransfersService {
 
     await this.emailQueueService.enqueueTemplateEmail({
       to: email,
-      subject: `Orden Creada - JUVECONF ${createdOrder!.year}`,
+      subject: `Orden Creada - JUVECONFE ${createdOrder!.year}`,
       template: 'order-pending',
       context: {
         orderId: createdOrder!.id,
@@ -341,7 +341,7 @@ export class TransfersService {
 
     await this.emailQueueService.enqueueTemplateEmail({
       to: email,
-      subject: 'Orden Creada - JUVECONF 2025',
+      subject: `Orden Creada - JUVECONFE ${new Date().getFullYear()}`,
       template: 'order-pending',
       context: {
         orderId: createdOrder!.id,

@@ -356,7 +356,7 @@ export class OrdersService {
         const editUrl = `${APP_CONFIG.staticSiteUrlForEmails}/equipos?id=${result.team.id}&token=${result.team.editToken}`;
         await this.emailQueueService.enqueueEmail({
           to: result.data.email,
-          subject: `Tu equipo quedo inscripto - JUVECONF ${result.data.year}`,
+          subject: `Tu equipo quedo inscripto - JUVECONFE ${result.data.year}`,
           html: teamConfirmedHtml({
             teamName: result.team.name,
             teamTypeName: result.team.TeamType?.name ?? '',
@@ -371,7 +371,7 @@ export class OrdersService {
       } else {
         await this.emailQueueService.enqueueTemplateEmail({
           to: result.data.email,
-          subject: `Tu entrada - JUVECONF ${result.data.year}`,
+          subject: `Tu entrada - JUVECONFE ${result.data.year}`,
           template: 'ticket-details',
           context: {
             paymentId: result.payment.id,

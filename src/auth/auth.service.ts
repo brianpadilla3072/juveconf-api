@@ -246,7 +246,7 @@ export class AuthService {
     // Encolar email con la contraseña temporal
     await this.emailQueueService.enqueueTemplateEmail({
       to: email,
-      subject: 'Contraseña Temporal - JUVECONF 2025',
+      subject: `Contraseña Temporal - JUVECONFE ${new Date().getFullYear()}`,
       template: 'reset-password',
       context: {
         temporaryPassword: temporaryPassword,

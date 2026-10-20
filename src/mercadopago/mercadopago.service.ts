@@ -330,7 +330,7 @@ export class MercadopagoService {
       try {
         await this.emailQueueService.enqueueTemplateEmail({
           to: order.email,
-          subject: 'Tu entrada - JUVECONF 2025',
+          subject: `Tu entrada - JUVECONFE ${new Date().getFullYear()}`,
           template: 'ticket-details',
           context: {
             paymentId: payment.id,

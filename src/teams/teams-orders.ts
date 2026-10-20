@@ -181,7 +181,7 @@ export function teamConfirmedHtml(params: {
     <tr><td align="center" style="padding:40px 20px;">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#141414;border-radius:16px;overflow:hidden;border:1px solid #262626;">
         <tr><td style="padding:32px;text-align:center;background:linear-gradient(135deg,#8B3FFF 0%,#6B2FDF 100%);">
-          <div style="color:#CCFF00;font-weight:900;font-size:18px;letter-spacing:1.5px;">JUVECONF</div>
+          <div style="color:#CCFF00;font-weight:900;font-size:18px;letter-spacing:1.5px;">JUVECONFE</div>
           <h1 style="color:#ffffff;margin:12px 0 0;font-size:26px;font-weight:800;">¡Tu equipo quedó inscripto! 🏆</h1>
         </td></tr>
         <tr><td style="padding:32px;">
@@ -203,7 +203,7 @@ export function teamConfirmedHtml(params: {
           </div>
         </td></tr>
         <tr><td style="padding:20px 32px;text-align:center;border-top:1px solid #262626;">
-          <p style="margin:0;color:#6f6f6f;font-size:12px;">Juventud en Conferencia · equipo@juveconfe.com</p>
+          <p style="margin:0;color:#6f6f6f;font-size:12px;">Juventud en Conferencia · administracion@vidaeternaiglesia.com</p>
         </td></tr>
       </table>
     </td></tr>

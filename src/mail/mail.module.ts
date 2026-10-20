@@ -27,7 +27,7 @@ import { EmailQueueModule } from '../email-queue/email-queue.module';
   return {
     transport: `smtps://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${config.get('MAIL_HOST')}:${port}`,
     defaults: {
-      from: `"JUVECONF" <${user}>`,
+      from: `"JUVECONFE" <${user}>`,
     },
     template: {
       dir: join(__dirname, 'templates'),

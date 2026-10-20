@@ -12,7 +12,7 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
   // El remitente tiene que ser una direccion que la cuenta SMTP pueda usar:
   // Zoho rechaza con "550 5.7.1 Sender is not allowed to relay emails" si el From no le pertenece.
-  private readonly defaultFrom = `"JUVECONF" <${process.env.MAIL_FROM || process.env.MAIL_USER || 'equipo@juveconfe.com'}>`;
+  private readonly defaultFrom = `"JUVECONFE" <${process.env.MAIL_FROM || process.env.MAIL_USER || 'administracion@vidaeternaiglesia.com'}>`;
 
   constructor(private readonly mailer: MailerService) {}
 
@@ -32,7 +32,8 @@ export class MailService {
         to,
         subject: subject || this.resolveSubject(templateName),
         template: templateName, // Handlebars template name
-        context, // Variables for the template
+        // Las plantillas usan {{year}} para no hardcodear el anio del evento
+        context: { year: new Date().getFullYear(), ...context },
         attachments,
       });
 
@@ -129,14 +130,15 @@ export class MailService {
    * Resuelve el asunto del correo según la plantilla
    */
   private resolveSubject(templateName: string): string {
+    const year = new Date().getFullYear();
     const subjects = {
-      'user-created': 'Bienvenido a JUVECONF 2025',
-      'payment-received': 'Pago Recibido - JUVECONF 2025',
-      'ticket-details': 'Tu entrada - JUVECONF 2025',
-      'reset-password': 'Contraseña Temporal - JUVECONF 2025',
-      'order-pending': 'Orden Creada - JUVECONF 2025',
+      'user-created': `Bienvenido a JUVECONFE ${year}`,
+      'payment-received': `Pago Recibido - JUVECONFE ${year}`,
+      'ticket-details': `Tu entrada - JUVECONFE ${year}`,
+      'reset-password': `Contraseña Temporal - JUVECONFE ${year}`,
+      'order-pending': `Orden Creada - JUVECONFE ${year}`,
     };
-    return subjects[templateName] || 'Notificación JUVECONF';
+    return subjects[templateName] || 'Notificación JUVECONFE';
   }
 
   /**

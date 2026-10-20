@@ -1,8 +1,8 @@
 export const APP_CONFIG = {
-  name: "JuveConf",
+  name: "JUVECONFE",
   fullName: "Juventud en Conferencia",
-  shortName: "JuveConf",
-  url: "https://juveconf.com",
+  shortName: "JUVECONFE",
+  url: "https://juve.vidaeternaiglesia.com",
 
   // URL del sitio estático para navegación web (puede ser local o producción)
   staticSiteUrl: process.env.STATIC_SITE_URL || "http://localhost:4321",
@@ -11,8 +11,8 @@ export const APP_CONFIG = {
   staticSiteUrlForEmails: "https://juve.vidaeternaiglesia.com",
 
   email: {
-    noreply: "equipo@juveconfe.com",
-    support: "equipo@juveconfe.com",
+    noreply: "administracion@vidaeternaiglesia.com",
+    support: "administracion@vidaeternaiglesia.com",
   },
 } as const;
 
