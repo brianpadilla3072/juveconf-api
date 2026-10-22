@@ -181,7 +181,15 @@ export class TransfersService {
       if (error instanceof CustomError) throw error;
       throw new CustomError(500, 'Error inesperado', 'Hubo un error al crear la orden de transferencia.');
     }
-    // 4) Enviar confirmacion usando template de Handlebars
+    // 4) Orden gratuita (total $0): no hay nada que transferir ni que verificar, se aprueba sola
+    // y listo (approveOrder crea los invitados y manda la entrada por email).
+    if (createdTotal === 0) {
+      console.log('[createTransferOrder] Orden gratuita, se aprueba automaticamente:', createdOrder!.id);
+      await this.ordersService.approveOrder(createdOrder!.id);
+      return { success: true, orderID: createdOrder!.id };
+    }
+
+    // 5) Enviar confirmacion usando template de Handlebars
     // Get current price to include in email
     const currentPrice = await this.combosService.getCurrentPrice(combo.id);
 
