@@ -23,10 +23,16 @@ export class AuthService {
     private emailQueueService: EmailQueueService,
   ) {}
 
+  // Todos los emails se manejan en minúsculas: el login funciona aunque el usuario
+  // escriba con mayúsculas y nunca se duplican cuentas por diferencias de case.
+  private normalizeEmail(email: string): string {
+    return (email || '').trim().toLowerCase();
+  }
+
   // Método para validar al usuario por email y contraseña
   async validateUser(email: string, password: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: this.normalizeEmail(email) },
     });
 
     if (!user) {
@@ -48,6 +54,7 @@ export class AuthService {
 
   // Si necesitas generar un token JWT, aquí tienes un ejemplo
   async login(email: string, password: string): Promise<{ access_token: string; requirePasswordChange?: boolean }> {
+    email = this.normalizeEmail(email);
     const isValid = await this.validateUser(email, password);
 
     if (!isValid) {
@@ -74,6 +81,9 @@ export class AuthService {
   async register(
     registerUserDto: RegisterUserDto,
   ): Promise<{ access_token: string }> {
+    // El email se guarda siempre en minúsculas
+    registerUserDto.email = this.normalizeEmail(registerUserDto.email);
+
     // Verificar si el email ya está en uso
     const existingUser = await this.prisma.user.findUnique({
       where: { email: registerUserDto.email },
@@ -117,7 +127,7 @@ export class AuthService {
 
   async getUserProfile(email: string): Promise<any> {
     return this.prisma.user.findUnique({
-      where: { email },
+      where: { email: this.normalizeEmail(email) },
     });
   }
 
@@ -130,7 +140,7 @@ export class AuthService {
 
     // Buscar el usuario
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: this.normalizeEmail(email) },
     });
 
     if (!user) {
@@ -215,6 +225,8 @@ export class AuthService {
    * Genera una contraseña temporal y envía email
    */
   async requestPasswordReset(email: string): Promise<{ message: string }> {
+    email = this.normalizeEmail(email);
+
     // Buscar usuario por email
     const user = await this.prisma.user.findUnique({
       where: { email },

@@ -11,10 +11,11 @@ export default class UsersService {
       // Cifra la contraseña antes de guardarla
       const hashedPassword = await this.passwordService.hashPassword(data.password);
   
-      // Guarda el usuario con la contraseña cifrada
+      // Guarda el usuario con la contraseña cifrada (email siempre en minúsculas)
       return this.prisma.user.create({
         data: {
           ...data,
+          email: (data.email || '').trim().toLowerCase(),
           password: hashedPassword,
         },
       });
@@ -30,6 +31,9 @@ export default class UsersService {
       async updateUser(id: string, data: UpdateUserDto): Promise<User> {
         if (data.password) {
           data.password = await this.passwordService.hashPassword(data.password);
+        }
+        if (data.email) {
+          data.email = data.email.trim().toLowerCase();
         }
         return this.prisma.user.update({
           where: { id },
