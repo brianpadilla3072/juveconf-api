@@ -56,6 +56,16 @@ export class MealsController {
   }
 
   // Venta en el lugar: suma comidas a un invitado con pago confirmado que todavia no tiene ninguna
+  @Post('admin/invitees/:inviteeId/meals/quote')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...ADMIN_ROLES)
+  quoteMealsOnSite(
+    @Param('inviteeId', new ParseUUIDPipe()) inviteeId: string,
+    @Body() dto: AssignMealsDto,
+  ) {
+    return this.mealsService.quoteOnSite(inviteeId, dto);
+  }
+
   @Post('admin/invitees/:inviteeId/meals')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...ADMIN_ROLES)
