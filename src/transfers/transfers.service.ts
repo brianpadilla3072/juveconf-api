@@ -343,6 +343,13 @@ export class TransfersService {
       throw new CustomError(500, 'Error inesperado', 'Hubo un error al crear la orden de pago en efectivo.');
     }
 
+    // Orden gratuita (total $0): no hay nada que pagar, se aprueba sola y manda la entrada.
+    if (createdOrder!.total === 0) {
+      console.log('[createCashOrder] Orden gratuita, se aprueba automaticamente:', createdOrder!.id);
+      await this.ordersService.approveOrder(createdOrder!.id);
+      return { success: true, orderID: createdOrder!.id };
+    }
+
     // 4) Enviar confirmacion usando template de Handlebars
     // Get current price to include in email
     const currentPrice = await this.combosService.getCurrentPrice(combo.id);
@@ -493,6 +500,13 @@ export class TransfersService {
       console.error('[createCashOrderSimple] Error al crear orden:', error);
       if (error instanceof CustomError) throw error;
       throw new CustomError(500, 'Error inesperado', 'Hubo un error al crear la orden de pago en efectivo.');
+    }
+
+    // Orden gratuita (total $0): no hay nada que pagar, se aprueba sola y manda la entrada.
+    if (createdOrder!.total === 0) {
+      console.log('[createCashOrderSimple] Orden gratuita, se aprueba automaticamente:', createdOrder!.id);
+      await this.ordersService.approveOrder(createdOrder!.id);
+      return { success: true, orderID: createdOrder!.id };
     }
 
     console.log('[createCashOrderSimple] Orden de pago en efectivo creada exitosamente (sin email).');
