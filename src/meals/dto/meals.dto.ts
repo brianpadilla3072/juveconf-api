@@ -1,5 +1,6 @@
 /* eslint-disable prettier/prettier */
-import { IsObject, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 
 const SLOT_CODE = /^[A-Z][A-Z0-9_]{1,19}$/;
 
@@ -55,4 +56,24 @@ export class AdminMealsQueryDto {
   @IsString()
   @MaxLength(60)
   q?: string;
+}
+
+export class MealPickDto {
+  @IsString()
+  @Matches(SLOT_CODE)
+  slotCode: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(99)
+  optionNumber: number;
+}
+
+export class AssignMealsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => MealPickDto)
+  picks: MealPickDto[];
 }

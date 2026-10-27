@@ -1,11 +1,12 @@
 /* eslint-disable prettier/prettier */
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus, Prisma } from '@prisma/client';
+import { OrderStatus, PaymentType, Prisma } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
 import { JwtService } from 'src/jwt/jwt.service';
 import { MealConfigSchema, parseMealConfig } from './meals-config.schema';
-import { normalizeRegistrationCode } from './meals-orders';
-import { DeliverMealDto, LookupMealDto, ScanMealDto, UpdateMealConfigDto } from './dto/meals.dto';
+import { createMealSelections, nextRegistrationCode, normalizeRegistrationCode } from './meals-orders';
+import { quoteMeals } from './meals-pricing';
+import { AssignMealsDto, DeliverMealDto, LookupMealDto, ScanMealDto, UpdateMealConfigDto } from './dto/meals.dto';
 
 export type MealStatus = 'PENDING' | 'DELIVERED' | 'NOT_PURCHASED' | 'UNPAID';
 
@@ -209,6 +210,97 @@ export class MealsService {
       return { delivered: false, status: 'UNPAID' as MealStatus };
     }
     return { delivered: false, status: 'DELIVERED' as MealStatus, deliveredAt: selection.deliveredAt };
+  }
+
+  /**
+   * Venta en el lugar: cotiza comidas nuevas para un invitado con pago confirmado.
+   * Si ya tiene comidas, el descuento por cantidad se calcula sobre el total (las anteriores + las nuevas)
+   * y se cobra solo la diferencia.
+   */
+  async quoteOnSite(inviteeId: string, dto: AssignMealsDto) {
+    const invitee = await this.prisma.invitee.findFirst({
+      where: { id: inviteeId, deletedAt: null },
+      select: {
+        id: true,
+        registrationCode: true,
+        MealSelection: { select: { slotCode: true, optionNumber: true } },
+        Order: { select: { id: true, year: true, status: true, eventId: true } },
+      },
+    });
+    if (!invitee?.Order) throw new NotFoundException('No encontramos al invitado');
+    if (invitee.Order.status !== OrderStatus.PAID) {
+      throw new BadRequestException('Solo se pueden asignar comidas a inscripciones con pago confirmado');
+    }
+
+    const event = await this.prisma.event.findFirst({
+      where: { id: invitee.Order.eventId, deletedAt: null },
+      select: { mealConfig: true },
+    });
+    const config = parseMealConfig(event?.mealConfig);
+    if (!config) throw new BadRequestException('Las comidas de este evento no estan configuradas');
+
+    const existing = invitee.MealSelection.map((m) => ({ slotCode: m.slotCode, optionNumber: m.optionNumber }));
+    const repeated = dto.picks.find((p) => existing.some((e) => e.slotCode === p.slotCode));
+    if (repeated) {
+      throw new BadRequestException(`Ya tiene comida para el turno ${repeated.slotCode}`);
+    }
+
+    const existingTotal = existing.length ? quoteMeals(config, [existing]).perAttendee[0].total : 0;
+    const combined = quoteMeals(config, [[...existing, ...dto.picks]]).perAttendee[0];
+    const newPicks = combined.picks.filter((p) => dto.picks.some((d) => d.slotCode === p.slotCode));
+    const subtotal = newPicks.reduce((sum, p) => sum + p.price, 0);
+    const total = combined.total - existingTotal;
+
+    return {
+      invitee: {
+        id: inviteeId,
+        registrationCode: invitee.registrationCode,
+        orderId: invitee.Order.id,
+        year: invitee.Order.year,
+        eventId: invitee.Order.eventId,
+      },
+      picks: newPicks,
+      subtotal,
+      discountPercent: combined.discountPercent,
+      discount: subtotal - total,
+      total,
+    };
+  }
+
+  /**
+   * Venta en el lugar: asigna las comidas cotizadas. Suma el total al pedido y registra un pago
+   * en efectivo por ese monto (se cobra en el momento).
+   */
+  async assignMealsOnSite(inviteeId: string, dto: AssignMealsDto) {
+    const quote = await this.quoteOnSite(inviteeId, dto);
+    const { orderId, year, eventId } = quote.invitee;
+    const invitee = await this.prisma.invitee.findUnique({
+      where: { id: inviteeId },
+      select: { name: true, cuil: true, email: true, registrationCode: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      if (!invitee?.registrationCode) {
+        const code = await nextRegistrationCode(tx, eventId);
+        await tx.invitee.update({ where: { id: inviteeId }, data: { registrationCode: code } });
+      }
+      await createMealSelections(tx, { inviteeId, orderId, picks: quote.picks });
+      await tx.order.update({ where: { id: orderId }, data: { total: { increment: quote.total } } });
+      await tx.payment.create({
+        data: {
+          year,
+          orderId,
+          amount: quote.total,
+          type: PaymentType.CASH,
+          externalReference: `MEALS-ONSITE-${inviteeId}-${Date.now()}`,
+          payerName: invitee?.name,
+          payerEmail: invitee?.email || undefined,
+          payerDni: invitee?.cuil,
+        },
+      });
+    });
+
+    return { success: true, total: quote.total, picks: quote.picks };
   }
 
   // ---------- administracion ----------
