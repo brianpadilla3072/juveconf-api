@@ -20,6 +20,18 @@ import { createMealSelections, nextRegistrationCode } from 'src/meals/meals-orde
 import { MealsQuote } from 'src/meals/meals-pricing';
 import { createTeamFromSnapshot, readTeamOrderSnapshot, teamConfirmedHtml } from 'src/teams/teams-orders';
 
+type MetadataAttendee = { name: string; cuil: string; metadata?: string };
+
+// Attendee.metadata viene como JSON string: { email?, phone?, ... }
+function parseAttendeeContact(metadata?: string): { email?: string; phone?: string } {
+  if (!metadata) return {};
+  try {
+    return JSON.parse(metadata);
+  } catch {
+    return {};
+  }
+}
+
 @Injectable()
 export class OrdersService {
     private readonly logger = new Logger(OrdersService.name);
@@ -165,21 +177,26 @@ export class OrdersService {
       }
     });
 
-    // Para cada orden, extraer información del metadataToken incluyendo phone y attendees
+    // Para cada orden: teléfono y personas del metadataToken (si no hay invitados creados todavía)
+    // y las relaciones en minúscula que consume el admin (event, combo, invitees)
     return orders.map(order => {
+      let phone: string | null = null;
+      let attendees: MetadataAttendee[] = [];
       if (order.metadataToken) {
         try {
           const metadataPayload = this.jwtService.decodeMetadata(order.metadataToken);
-          
-          // Agregar phone del metadataToken si existe
-          const orderWithPhone = {
-            ...order,
-            phone: metadataPayload?.phone || null
-          };
+          phone = metadataPayload?.phone || null;
+          attendees = metadataPayload?.attendees ?? [];
+        } catch (error) {
+          this.logger.warn(`[OrdersService] Error al decodificar metadataToken para orden ${order.id}:`, error.message);
+        }
+      }
 
-          // Si no tiene invitados creados pero tiene attendees en el token, crear invitados virtuales
-          if (order.Invitee.length === 0 && metadataPayload?.attendees?.length) {
-            const virtualInvitees = metadataPayload.attendees.map(attendee => ({
+      const invitees = order.Invitee.length > 0
+        ? order.Invitee
+        : attendees.map(attendee => {
+            const contact = parseAttendeeContact(attendee.metadata);
+            return {
               id: `virtual-${order.id}-${attendee.cuil}`,
               name: attendee.name,
               cuil: attendee.cuil,
@@ -189,23 +206,20 @@ export class OrdersService {
               createdAt: order.createdAt,
               updatedAt: order.updatedAt,
               deletedAt: null,
-              email: null,
-              phone: null
-            }));
-            
-            return {
-              ...orderWithPhone,
-              invitees: virtualInvitees
+              email: contact.email ?? null,
+              phone: contact.phone ?? null,
+              metadata: attendee.metadata ?? null,
+              registrationCode: null,
             };
-          }
+          });
 
-          return orderWithPhone;
-        } catch (error) {
-          this.logger.warn(`[OrdersService] Error al decodificar metadataToken para orden ${order.id}:`, error.message);
-        }
-      }
-      
-      return order;
+      return {
+        ...order,
+        phone: phone ?? order.phone,
+        event: order.Event,
+        combo: order.Combo,
+        invitees,
+      };
     });
   }
 
