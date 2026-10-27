@@ -19,6 +19,7 @@ import { EmailQueueService } from 'src/email-queue/email-queue.service';
 import { createMealSelections, nextRegistrationCode } from 'src/meals/meals-orders';
 import { MealsQuote } from 'src/meals/meals-pricing';
 import { createTeamFromSnapshot, readTeamOrderSnapshot, teamConfirmedHtml } from 'src/teams/teams-orders';
+import { buildOrderPurchase } from './order-purchase';
 
 type MetadataAttendee = { name: string; cuil: string; metadata?: string };
 
@@ -170,7 +171,7 @@ export class OrdersService {
         Event: true,
         Combo: true, // Relación one-to-one
         Payment: true,
-        Invitee: true
+        Invitee: { include: { MealSelection: { select: { optionName: true, slotCode: true } } } }
       },
       orderBy: {
         createdAt: 'desc'
@@ -219,6 +220,13 @@ export class OrdersService {
         event: order.Event,
         combo: order.Combo,
         invitees,
+        purchase: buildOrderPurchase({
+          comboName: order.Combo?.name,
+          createdAt: order.createdAt,
+          invitees: order.Invitee,
+          attendees,
+          snapshot: order.orderSnapshot,
+        }),
       };
     });
   }
