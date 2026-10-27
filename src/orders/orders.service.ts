@@ -303,7 +303,10 @@ export class OrdersService {
           externalReference: metadataPayload.orderId,
           userId: order.userId || undefined,
           payerEmail: order.email || undefined,
-          payerName: metadataPayload.name || undefined,
+          // El token no trae nombre del pagador: se toma del invitado con el mismo DNI que la orden
+          payerName: metadataPayload.name
+            || metadataPayload.attendees?.find(a => a.cuil === order.cuil)?.name
+            || undefined,
           payerDni: metadataPayload.cuil || undefined,
           payerPhone: metadataPayload.phone || undefined,
         }
