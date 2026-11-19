@@ -101,6 +101,37 @@ export class EmailQueueService {
     });
   }
 
+  /**
+   * Difiere un correo SIN consumir un intento y SIN cambiar su estado.
+   * Se usa cuando el SMTP rechaza por límite de tasa: no es un error del
+   * destinatario, así que debe volver a intentarse en el próximo ciclo.
+   */
+  async deferEmail(id: string, errorMessage: string) {
+    return this.prisma.emailQueue.update({
+      where: { id },
+      data: {
+        lastAttemptAt: new Date(),
+        errorMessage,
+      },
+    });
+  }
+
+  /**
+   * Correos efectivamente enviados desde el inicio del día del servidor.
+   * Se usa para no superar el cupo diario del proveedor SMTP.
+   */
+  async countSentToday(now: Date = new Date()): Promise<number> {
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    return this.prisma.emailQueue.count({
+      where: {
+        status: EmailStatus.SENT,
+        sentAt: { gte: startOfDay },
+      },
+    });
+  }
+
   async getStats() {
     const [pending, sent, failed] = await Promise.all([
       this.prisma.emailQueue.count({
