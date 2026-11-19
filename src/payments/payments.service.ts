@@ -14,6 +14,7 @@ import { JwtService } from '../jwt/jwt.service';
 import { CreatePaymentDto, UpdatePaymentDto } from './DTOs';
 import { DashboardFilterDto } from './DTOs/dashboard-filter.dto';
 import { PaymentType } from '@prisma/client';
+import { buildOrderPurchase } from 'src/orders/order-purchase';
 
 @Injectable()
 export class PaymentsService {
@@ -34,12 +35,41 @@ export class PaymentsService {
 
   async findAll(year?: string) {
     const yearNumber = year ? Number(year) : undefined;
-    return this.prisma.payment.findMany({
+    const payments = await this.prisma.payment.findMany({
       where: {
         deletedAt: null,
         ...(yearNumber && !Number.isNaN(yearNumber) ? { year: yearNumber } : {}),
       },
+      include: {
+        Order: {
+          select: {
+            status: true,
+            total: true,
+            createdAt: true,
+            orderSnapshot: true,
+            Combo: { select: { name: true } },
+            Invitee: { include: { MealSelection: { select: { optionName: true, slotCode: true } } } },
+          },
+        },
+      },
     });
+
+    // order: resumen de la compra (combo, cantidad, fecha y hora, comidas por persona)
+    return payments.map(({ Order, ...payment }) => ({
+      ...payment,
+      order: Order
+        ? {
+            status: Order.status,
+            total: Order.total,
+            purchase: buildOrderPurchase({
+              comboName: Order.Combo?.name,
+              createdAt: Order.createdAt,
+              invitees: Order.Invitee,
+              snapshot: Order.orderSnapshot,
+            }),
+          }
+        : null,
+    }));
   }
 
   async findOne(id: string) {

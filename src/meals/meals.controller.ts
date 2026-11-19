@@ -16,7 +16,7 @@ import { UserRole } from '@prisma/client';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { AdminMealsQueryDto, DeliverMealDto, LookupMealDto, ScanMealDto, UpdateMealConfigDto } from './dto/meals.dto';
+import { AdminMealsQueryDto, AssignMealsDto, DeliverMealDto, LookupMealDto, ScanMealDto, UpdateMealConfigDto } from './dto/meals.dto';
 import { MealsService } from './meals.service';
 
 const ADMIN_ROLES = [UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SUPERADMIN];
@@ -53,6 +53,27 @@ export class MealsController {
   @Roles(...ADMIN_ROLES)
   registrations(@Query() query: AdminMealsQueryDto) {
     return this.mealsService.registrations(query.eventId, query.q);
+  }
+
+  // Venta en el lugar: suma comidas a un invitado con pago confirmado que todavia no tiene ninguna
+  @Post('admin/invitees/:inviteeId/meals/quote')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...ADMIN_ROLES)
+  quoteMealsOnSite(
+    @Param('inviteeId', new ParseUUIDPipe()) inviteeId: string,
+    @Body() dto: AssignMealsDto,
+  ) {
+    return this.mealsService.quoteOnSite(inviteeId, dto);
+  }
+
+  @Post('admin/invitees/:inviteeId/meals')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...ADMIN_ROLES)
+  assignMealsOnSite(
+    @Param('inviteeId', new ParseUUIDPipe()) inviteeId: string,
+    @Body() dto: AssignMealsDto,
+  ) {
+    return this.mealsService.assignMealsOnSite(inviteeId, dto);
   }
 
   @Get('admin/stats')
